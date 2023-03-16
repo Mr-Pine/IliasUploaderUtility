@@ -6,3 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# https://crates.io/crates/scraper
+# https://crates.io/crates/voyager
+# https://crates.io/crates/reqwest
