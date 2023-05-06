@@ -1,4 +1,4 @@
-use reqwest::{Client, redirect::{self, Policy}, cookie::Jar};
+use reqwest::Client;
 mod authentication;
 mod constants;
 use crate::authentication::authenticate;
@@ -8,16 +8,10 @@ use crate::authentication::authenticate;
 async fn main() {
     println!("Hello, world!");
 
-    let log_redirects = redirect::Policy::custom(|attempt| {
-        println!("{}, Location: {:?}", attempt.status(), attempt.url());
-        if attempt.previous().len() >= 0 {
-            attempt.stop()
-        } else {
-            attempt.follow()
-        }
-    });
+    let reqwest_client = Client::builder().cookie_store(true).build().unwrap();
 
-    let reqwest_client = Client::builder().redirect(Policy::none()).cookie_store(true).build().unwrap();
+    let username = include_str!("username.txt");
+    let password = include_str!("password.txt");
 
-    authenticate(reqwest_client).await;
+    authenticate(reqwest_client, username, password).await.unwrap();
 }
