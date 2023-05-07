@@ -1,11 +1,11 @@
 use std::error::Error;
 
-use crate::constants::ILIAS_URL;
+use crate::util::ILIAS_URL;
 use reqwest::Client;
 use scraper::{Html, Selector};
 
 pub async fn authenticate(
-    client: Client,
+    client: &Client,
     username: &str,
     password: &str,
 ) -> Result<(), Box<dyn Error>> {
