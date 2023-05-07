@@ -1,10 +1,10 @@
 use std::error::Error;
 
 use crate::util::ILIAS_URL;
-use reqwest::Client;
+use reqwest::blocking::Client;
 use scraper::{Html, Selector};
 
-pub async fn authenticate(
+pub fn authenticate(
     client: &Client,
     username: &str,
     password: &str,
@@ -22,8 +22,7 @@ pub async fn authenticate(
     let shib_login_page = client
         .post(shib_url.clone())
         .form(&shib_params)
-        .send()
-        .await?;
+        .send()?;
 
     let mut url = shib_login_page.url().to_owned();
     let is_ilias = url.as_str().starts_with(ILIAS_URL);
@@ -32,7 +31,7 @@ pub async fn authenticate(
         return Ok(());
     }
 
-    let shib_login_fragment = Html::parse_document(shib_login_page.text().await?.as_str());
+    let shib_login_fragment = Html::parse_document(shib_login_page.text()?.as_str());
     let csrf_selector = Selector::parse(r#"input[name="csrf_token"]"#)?;
     let crsf_field = shib_login_fragment.select(&csrf_selector).next();
 
@@ -61,9 +60,9 @@ pub async fn authenticate(
         let mut parts = post_path.split("?");
         url.set_path(parts.next().unwrap());
         url.set_query(parts.next());
-        let continue_response = client.post(url.clone()).form(&form_data).send().await?;
+        let continue_response = client.post(url.clone()).form(&form_data).send()?;
 
-        shib_continue_fragment = Html::parse_document(continue_response.text().await?.as_str());
+        shib_continue_fragment = Html::parse_document(continue_response.text()?.as_str());
     } else {
         shib_continue_fragment = shib_login_fragment;
     }
@@ -89,7 +88,7 @@ pub async fn authenticate(
 
     let ilias_home = client.post(continue_url).form(&continue_form_data).send();
 
-    if ilias_home.await?.status().is_success() {
+    if ilias_home?.status().is_success() {
         println!("Logged in!");
         Ok(())
     } else {
