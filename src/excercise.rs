@@ -21,6 +21,7 @@ pub struct Excercise {
 }
 
 impl Excercise {
+    #[allow(dead_code)]
     pub fn new(
         client: &Client,
         excercise: ElementRef<'_>,
@@ -28,7 +29,10 @@ impl Excercise {
     ) -> Result<Excercise, Box<dyn Error>> {
         let mut raw = Self::parse_from(excercise, base_url)?;
         let overview_page = raw.get_overview_page(client).unwrap();
-        raw.set_overview_page(overview_page);
+        {
+            let ref mut this = raw;
+            this.overview_page = Some(overview_page);
+        };
         Ok(raw)
     }
 
@@ -83,11 +87,7 @@ impl Excercise {
         }
     }
 
-    fn set_overview_page(&mut self, page: Html) {
-        self.overview_page = Some(page);
-    }
-
-    pub fn delete_all_files(self: &Self, client: Client) {
+    pub fn delete_all_files(self: &Self, client: &Client) {
         let page = self.get_overview_page(&client).unwrap();
         let files = File::parse_uploaded_files(&page);
         let ids = files.iter().map(|file| file.id.clone());
@@ -101,26 +101,17 @@ impl Excercise {
             .unwrap();
 
         let url = set_querypath(self.submit_url.clone().unwrap(), delete_querypath);
-        dbg!(&files);
 
         let mut form_args = ids.map(|id| ("delivered[]", id)).collect::<Vec<_>>();
         form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));
 
-        let confirm_response = client.post(url.clone()).form(&form_args).send().unwrap();
-
-        /* let confirm_html = Html::parse_document(confirm_response.text().await.unwrap().as_str());
-        let confirm_querypath = confirm_html.select(&form_selector).next().unwrap().value().attr("action").unwrap();
-        let confirm_url = set_querypath(url, confirm_querypath);
-
-        let test = client.post(confirm_url).form(&form_args).send().await.unwrap(); */
-        dbg!(&confirm_response);
-        dbg!(&confirm_response.text());
+        let _confirm_response = client.post(url.clone()).form(&form_args).send().unwrap();
     }
 
-    pub fn upload_files(&self, client: &Client, file_paths: Vec<&str>) {
+    pub fn upload_files(&self, client: &Client, file_paths: &Vec<String>) {
         let mut form = multipart::Form::new();
 
-        for (index, &file_path) in file_paths.iter().enumerate() {
+        for (index, file_path) in file_paths.iter().enumerate() {
             form = form.file(format!("deliver[{}]", index), file_path).unwrap();
         }
 
@@ -149,9 +140,6 @@ impl Excercise {
 
         let url = set_querypath(url, submit_querypath);
 
-        let test = client.post(url).multipart(form).send().unwrap();
-
-        dbg!(&test);
-        dbg!(&test.text().unwrap());
+        client.post(url).multipart(form).send().unwrap();
     }
 }

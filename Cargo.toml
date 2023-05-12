@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 reqwest ={version =  "0.11.17", features = ["cookies", "multipart", "blocking"]}
 scraper = "0.16.0"
-tokio = { version = "1.28.0", features = ["full"] }
-futures = "0.3.28"
-# https://crates.io/crates/scraper
-# https://crates.io/crates/voyager
-# https://crates.io/crates/reqwest
+clap = { version = "4.2.7", features = ["derive"] }
+dialoguer = "0.10.4"
+keyring = "2.0.2"
+toml = "0.7.3"
+serde = "1.0.163"

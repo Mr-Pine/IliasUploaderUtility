@@ -5,6 +5,7 @@ use scraper::{Html, Selector};
 
 use crate::{ilias_url, excercise::Excercise};
 
+#[derive(Debug)]
 pub struct Course {
     pub name: String,
     pub excercises: Vec<Excercise>
@@ -19,8 +20,6 @@ impl Course {
 
         let part_selector = Selector::parse(r#"div.il_VAccordionContainer div.il_VAccordionInnerContainer"#).unwrap();
         let excercises = course_page.select(&part_selector).map(|excercise| {Excercise::parse_from(excercise, ilias_url.clone()).unwrap()}).collect::<Vec<Excercise>>();
-
-        dbg!(&excercises);
 
         Ok(Course {
             name: String::from(name),
