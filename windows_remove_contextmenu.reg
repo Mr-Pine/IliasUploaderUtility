@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+[-HKEY_CURRENT_USER\Software\Classes\SystemFileAssociations\.pdf\shell\iliasUpload]
+"MUIVerb"="Upload to ilias"
+"icon"="%AppData%\\ilias_uploader_utility\\res\\favicon.ico"
+
+[-HKEY_CURRENT_USER\Software\Classes\SystemFileAssociations\.pdf\shell\iliasUpload\command]
+@="cmd /k \"ilias_uploader_utility \"%1\"\""
