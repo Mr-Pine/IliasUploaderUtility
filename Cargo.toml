@@ -13,3 +13,5 @@ dialoguer = "0.11.0"
 keyring = "2.0.5"
 toml = "0.8.2"
 serde = { version = "1.0.189", features = ["derive"] }
+regex = "1.10.2"
+anyhow = "1.0.75"

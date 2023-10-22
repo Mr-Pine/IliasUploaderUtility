@@ -1,2 +1,4 @@
-ilias_id = '2107145'
+ilias_id = '1234567'
 username = 'hier könnte ihr u-Kürzel stehen'
+transform_regex = 'test(?<index>\d+)'
+transform_format = 'my_test_${index}'

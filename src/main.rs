@@ -1,5 +1,6 @@
-use std::{env, error::Error, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use dialoguer::{theme::ColorfulTheme, Confirm, Password, Select};
 use keyring::Entry;
@@ -10,27 +11,29 @@ mod authentication;
 mod config;
 mod course;
 mod excercise;
+mod transform;
 mod util;
 use crate::{
     arguments::Arguments, authentication::authenticate, config::Config, course::Course,
+    excercise::FileData, transform::Transformer,
 };
 
-fn main() {
+fn main() -> Result<()> {
     let cli_args: Arguments = Arguments::parse();
     let config_file_content = search_config(&cli_args.search_depth);
-    let file_config: Option<Config> = match config_file_content {
-        Ok(content) => toml::from_str(&content).unwrap(),
-        Err(_) => None,
+    let file_config: Config = match config_file_content {
+        Ok(content) => toml::from_str::<Config>(&content).context("Could not parse config")?,
+        Err(_) => Config::default(),
     };
 
     let ilias_id = match cli_args.ilias_id {
         Some(id) => id,
-        None => file_config.clone().unwrap().ilias_id.unwrap(),
+        None => file_config.ilias_id.unwrap(),
     };
 
     let username = match cli_args.username {
         Some(user) => user,
-        None => file_config.clone().unwrap().username.unwrap(),
+        None => file_config.username.unwrap(),
     };
 
     let password = match cli_args.password {
@@ -62,7 +65,7 @@ fn main() {
 
     let reqwest_client = Client::builder().cookie_store(true).build().unwrap();
     authenticate(&reqwest_client, &username, &password).unwrap();
-    let target = Course::from_id(&reqwest_client, &ilias_id, "test_HM").unwrap();
+    let target = Course::from_id(&reqwest_client, &ilias_id, "unknown").unwrap();
 
     let active_excercises: Vec<_> = target
         .excercises
@@ -96,20 +99,37 @@ fn main() {
             selected_excercise.delete_all_files(&reqwest_client)
         }
     }
-    
-    selected_excercise.upload_files(&reqwest_client, &cli_args.file_paths);
 
-    println!("Uploaded {} successfully!", cli_args.file_paths.join(", "))
+    let transform_regex = file_config.transform_regex;
+    let transform_format = file_config.transform_format;
+
+    let transformer = Transformer::new(transform_regex, transform_format)?;
+
+    let transformed_file_paths = cli_args.file_paths.iter().map(|path| FileData {
+        name: match &transformer {
+            Some(transformer) => transformer.transform_path(path).unwrap().to_string_lossy().into_owned(),
+            None => path.to_string(),
+        },
+        path: path.to_string(),
+    });
+
+    dbg!(&transformed_file_paths);
+    dbg!(&cli_args.file_paths);
+
+    selected_excercise.upload_files(&reqwest_client, transformed_file_paths);
+
+    println!("Uploaded {} successfully!", cli_args.file_paths.join(", "));
+    Ok(())
 }
 
 const CONFIG_FILE_NAME: &str = ".ilias_upload";
 
-fn search_config(depth: &i16) -> Result<String, Box<dyn Error>> {
+fn search_config(depth: &i16) -> Result<String> {
     let mut current_dir = env::current_dir()?;
     if contains_config_file(&current_dir)? {
         return match fs::read_to_string(current_dir.join(CONFIG_FILE_NAME)) {
             Ok(file) => Ok(file),
-            Err(_) => Err("Could not read config file".into()),
+            Err(_) => Err(anyhow!("Could not read config file")),
         };
     }
 
@@ -118,15 +138,15 @@ fn search_config(depth: &i16) -> Result<String, Box<dyn Error>> {
         if contains_config_file(&current_dir)? {
             return match fs::read_to_string(current_dir.join(CONFIG_FILE_NAME)) {
                 Ok(file) => Ok(file),
-                Err(_) => Err("Could not read config file".into()),
+                Err(_) => Err(anyhow!("Could not read config file")),
             };
         }
     }
 
-    Err("Could not find config file".into())
+    Err(anyhow!("Could not find config file"))
 }
 
-fn contains_config_file(path: &PathBuf) -> Result<bool, Box<dyn Error>> {
+fn contains_config_file(path: &PathBuf) -> Result<bool> {
     let found = path
         .read_dir()?
         .into_iter()

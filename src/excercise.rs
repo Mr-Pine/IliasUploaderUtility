@@ -1,9 +1,9 @@
 pub mod file;
-use std::error::Error;
+use std::{error::Error, path::Path, fmt::Debug, borrow::Cow};
 
 use reqwest::{
-    blocking::{multipart, Client},
-    Url,
+    blocking::{multipart::{Part, Form}, Client},
+    Url
 };
 use scraper::{ElementRef, Html, Selector};
 
@@ -108,11 +108,12 @@ impl Excercise {
         let _confirm_response = client.post(url.clone()).form(&form_args).send().unwrap();
     }
 
-    pub fn upload_files(&self, client: &Client, file_paths: &Vec<String>) {
-        let mut form = multipart::Form::new();
+    pub fn upload_files<I: Iterator<Item = FileData>>(&self, client: &Client, file_data_iter: I) {
+        let mut form = Form::new();
 
-        for (index, file_path) in file_paths.iter().enumerate() {
-            form = form.file(format!("deliver[{}]", index), file_path).unwrap();
+        for (index, file_path) in file_data_iter.enumerate() {
+            dbg!(&file_path);
+            form = form.file_with_name(format!("deliver[{}]", index), file_path.path, file_path.name).unwrap();
         }
 
         let upload_button_selector = Selector::parse(r#"nav div.navbar-header button"#).unwrap();
@@ -141,5 +142,30 @@ impl Excercise {
         let url = set_querypath(url, submit_querypath);
 
         client.post(url).multipart(form).send().unwrap();
+    }
+}
+
+#[derive(Debug)]
+pub struct FileData {
+    pub path: String,
+    pub name: String
+}
+
+pub trait AddFileWithFilename {
+    fn file_with_name<T, U, V>(self, name: T, path: U, filename: V) -> std::io::Result<Form>
+    where
+        T: Into<Cow<'static, str>>,
+        U: AsRef<Path>,
+        V: Into<Cow<'static, str>>;
+}
+
+impl AddFileWithFilename for Form {
+    fn file_with_name<T, U, V>(self, name: T, path: U, filename: V) -> std::io::Result<Form>
+    where
+        T: Into<Cow<'static, str>>,
+        U: AsRef<Path>,
+        V: Into<Cow<'static, str>>
+    {
+        Ok(self.part(name, Part::file(path)?.file_name(filename)))
     }
 }
