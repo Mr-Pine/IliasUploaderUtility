@@ -10,12 +10,17 @@ mod arguments;
 mod authentication;
 mod config;
 mod course;
-mod excercise;
+mod preselect_delete_setting;
 mod transform;
+mod uploaders;
 mod util;
 use crate::{
-    arguments::Arguments, authentication::authenticate, config::Config, course::Course,
-    excercise::FileData, transform::Transformer,
+    arguments::Arguments,
+    authentication::authenticate,
+    config::Config,
+    course::Course,
+    transform::Transformer,
+    uploaders::{file_data::FileData, upload_provider::UploadProvider, delete_selection::DeleteSelection},
 };
 
 fn main() -> Result<()> {
@@ -61,6 +66,14 @@ fn main() -> Result<()> {
         }
     };
 
+    let preselect_delete_setting = match cli_args.preselect_delete {
+        Some(setting) => setting,
+        None => match file_config.preselect_delete {
+            Some(setting) => setting,
+            None => preselect_delete_setting::PreselectDeleteSetting::SMART,
+        },
+    };
+
     println!("Checking ilias course {}", ilias_id);
 
     let reqwest_client = Client::builder().cookie_store(true).build().unwrap();
@@ -87,7 +100,23 @@ fn main() -> Result<()> {
 
     let selected_excercise = active_excercises[selected_index];
 
-    // TODO: Select what to delete
+    let transform_regex = file_config.transform_regex;
+    let transform_format = file_config.transform_format;
+
+    let transformer = Transformer::new(transform_regex, transform_format)?;
+
+    let transformed_file_data = cli_args.file_paths.iter().map(|path| FileData {
+        name: match &transformer {
+            Some(transformer) => transformer
+                .transform_path(path)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
+            None => path.to_string(),
+        },
+        path: path.to_string(),
+    });
+
     if selected_excercise.has_files {
         let delete = Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt("This excercise already has uploaded files. Do you want to delete them?")
@@ -96,27 +125,12 @@ fn main() -> Result<()> {
             .unwrap();
 
         if delete {
-            selected_excercise.delete_all_files(&reqwest_client)
+            let selection = selected_excercise.select_files_to_delete(&reqwest_client, preselect_delete_setting, &transformed_file_data);
+            selected_excercise.delete_files(&reqwest_client, selection?)
         }
     }
 
-    let transform_regex = file_config.transform_regex;
-    let transform_format = file_config.transform_format;
-
-    let transformer = Transformer::new(transform_regex, transform_format)?;
-
-    let transformed_file_paths = cli_args.file_paths.iter().map(|path| FileData {
-        name: match &transformer {
-            Some(transformer) => transformer.transform_path(path).unwrap().to_string_lossy().into_owned(),
-            None => path.to_string(),
-        },
-        path: path.to_string(),
-    });
-
-    dbg!(&transformed_file_paths);
-    dbg!(&cli_args.file_paths);
-
-    selected_excercise.upload_files(&reqwest_client, transformed_file_paths);
+    selected_excercise.upload_files(&reqwest_client, transformed_file_data);
 
     println!("Uploaded {} successfully!", cli_args.file_paths.join(", "));
     Ok(())

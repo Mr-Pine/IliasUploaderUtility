@@ -1,13 +1,13 @@
 use scraper::{Selector, Html};
 
-#[derive(Debug)]
-pub struct File {
+#[derive(Debug, Clone)]
+pub struct ExistingFile {
     pub name: String,
     pub id: String
 }
 
-impl File {
-    pub fn parse_uploaded_files(page: &Html) -> Vec<File> {
+impl ExistingFile {
+    pub fn parse_uploaded_files(page: &Html) -> Vec<ExistingFile> {
         let file_row_selector = Selector::parse(r#"form tbody tr"#).unwrap();
         let file_rows = page.select(&file_row_selector);
         
@@ -18,7 +18,7 @@ impl File {
             let file_id = file_row.select(&id_selector).next().unwrap().value().attr("value").unwrap();
             let file_name = file_row.select(&name_selector).next().unwrap().text().collect::<String>();
 
-            File { name: file_name, id: file_id.to_string() }
+            ExistingFile { name: file_name, id: file_id.to_string() }
         }).collect()
     }
 }

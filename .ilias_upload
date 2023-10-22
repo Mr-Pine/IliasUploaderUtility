@@ -1,4 +1,5 @@
 ilias_id = '1234567'
 username = 'hier könnte ihr u-Kürzel stehen'
+preselect_delete = SMART
 transform_regex = 'test(?<index>\d+)'
 transform_format = 'my_test_${index}'

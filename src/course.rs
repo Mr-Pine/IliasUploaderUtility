@@ -3,7 +3,7 @@ use std::error::Error;
 use reqwest::{blocking::Client, Url};
 use scraper::{Html, Selector};
 
-use crate::{ilias_url, excercise::Excercise};
+use crate::{ilias_url, uploaders::excercise::Excercise};
 
 #[derive(Debug)]
 pub struct Course {

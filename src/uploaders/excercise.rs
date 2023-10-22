@@ -1,15 +1,19 @@
-pub mod file;
-use std::{error::Error, path::Path, fmt::Debug, borrow::Cow};
+pub mod existing_file;
+use std::{error::Error, fmt::Debug};
 
+use anyhow::Result;
+use dialoguer::{MultiSelect, theme::ColorfulTheme};
 use reqwest::{
-    blocking::{multipart::{Part, Form}, Client},
+    blocking::{multipart::Form, Client},
     Url
 };
 use scraper::{ElementRef, Html, Selector};
 
-use crate::util::set_querypath;
+use crate::{util::set_querypath, uploaders::file_with_filename::AddFileWithFilename, preselect_delete_setting::PreselectDeleteSetting};
 
-use self::file::File;
+use self::existing_file::ExistingFile;
+
+use super::{upload_provider::UploadProvider, file_data::FileData, delete_selection::DeleteSelection};
 
 #[derive(Debug)]
 pub struct Excercise {
@@ -86,29 +90,12 @@ impl Excercise {
             Some(Html::parse_document(response.text().unwrap().as_str()))
         }
     }
+}
 
-    pub fn delete_all_files(self: &Self, client: &Client) {
-        let page = self.get_overview_page(&client).unwrap();
-        let files = File::parse_uploaded_files(&page);
-        let ids = files.iter().map(|file| file.id.clone());
-        let form_selector = Selector::parse(r#"div#ilContentContainer form"#).unwrap();
-        let delete_querypath = page
-            .select(&form_selector)
-            .next()
-            .unwrap()
-            .value()
-            .attr("action")
-            .unwrap();
+impl UploadProvider for Excercise {
+    type UploadedFile = ExistingFile;
 
-        let url = set_querypath(self.submit_url.clone().unwrap(), delete_querypath);
-
-        let mut form_args = ids.map(|id| ("delivered[]", id)).collect::<Vec<_>>();
-        form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));
-
-        let _confirm_response = client.post(url.clone()).form(&form_args).send().unwrap();
-    }
-
-    pub fn upload_files<I: Iterator<Item = FileData>>(&self, client: &Client, file_data_iter: I) {
+    fn upload_files<I: Iterator<Item = FileData>>(&self, client: &Client, file_data_iter: I) {
         let mut form = Form::new();
 
         for (index, file_path) in file_data_iter.enumerate() {
@@ -143,29 +130,62 @@ impl Excercise {
 
         client.post(url).multipart(form).send().unwrap();
     }
+
+
+
+    fn get_conflicting_files(self: &Self, client: &Client) -> Vec<ExistingFile> {
+        let page = self.get_overview_page(&client).unwrap();
+        let files = ExistingFile::parse_uploaded_files(&page);
+        return files;
+    }
+
+    fn delete_files<I: IntoIterator<Item = Self::UploadedFile>>(self: &Self, client: &Client, files: I) {
+        let page = self.get_overview_page(client).unwrap();
+        let ids = files.into_iter().map(|file| file.id.clone());
+        let form_selector = Selector::parse(r#"div#ilContentContainer form"#).unwrap();
+        let delete_querypath = page
+            .select(&form_selector)
+            .next()
+            .unwrap()
+            .value()
+            .attr("action")
+            .unwrap();
+
+        let url = set_querypath(self.submit_url.clone().unwrap(), delete_querypath);
+
+        let mut form_args = ids.map(|id| ("delivered[]", id)).collect::<Vec<_>>();
+        form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));
+
+        let _confirm_response = client.post(url.clone()).form(&form_args).send().unwrap();
+    }
 }
 
-#[derive(Debug)]
-pub struct FileData {
-    pub path: String,
-    pub name: String
-}
-
-pub trait AddFileWithFilename {
-    fn file_with_name<T, U, V>(self, name: T, path: U, filename: V) -> std::io::Result<Form>
-    where
-        T: Into<Cow<'static, str>>,
-        U: AsRef<Path>,
-        V: Into<Cow<'static, str>>;
-}
-
-impl AddFileWithFilename for Form {
-    fn file_with_name<T, U, V>(self, name: T, path: U, filename: V) -> std::io::Result<Form>
-    where
-        T: Into<Cow<'static, str>>,
-        U: AsRef<Path>,
-        V: Into<Cow<'static, str>>
-    {
-        Ok(self.part(name, Part::file(path)?.file_name(filename)))
+impl DeleteSelection for Excercise {
+    fn select_files_to_delete<I: Iterator<Item = FileData>>(self: &Self, client: &Client, preselect_setting: PreselectDeleteSetting, file_data: &I) -> Result<Box<dyn Iterator<Item = ExistingFile>>> where I: Clone {
+        let files = self.get_conflicting_files(&client);
+            let mapped_files: Vec<(&str, bool)> = files
+                .iter()
+                .map(|file| {
+                    (
+                        file.name.as_str(),
+                        if preselect_setting == PreselectDeleteSetting::ALL {
+                            true
+                        } else if preselect_setting == PreselectDeleteSetting::NONE {
+                            false
+                        } else {
+                            file_data
+                                .clone()
+                                .any(|file_data| file_data.name == file.name)
+                        }
+                    )
+                })
+                .collect();
+            let selection = MultiSelect::with_theme(&ColorfulTheme::default())
+                .with_prompt("Which files do you want to delete")
+                .items_checked(&mapped_files)
+                .interact()?
+                .into_iter()
+                .map(move |index| files[index].clone());
+            return Ok(Box::from(selection));
     }
 }

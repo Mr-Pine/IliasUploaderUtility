@@ -1,5 +1,7 @@
 use clap::Parser;
 
+use crate::preselect_delete_setting::PreselectDeleteSetting;
+
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Arguments {
@@ -19,5 +21,8 @@ pub struct Arguments {
     pub password: Option<String>,
 
     #[arg(long, default_value_t = true)]
-    pub store_password: bool
+    pub store_password: bool,
+
+    #[arg(long, value_enum)]
+    pub preselect_delete: Option<PreselectDeleteSetting>
 }
