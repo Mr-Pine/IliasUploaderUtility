@@ -1,10 +1,17 @@
 use anyhow::Result;
-use reqwest::blocking::Client;
 
 use crate::preselect_delete_setting::PreselectDeleteSetting;
 
-use super::{file_data::FileData, excercise::existing_file::ExistingFile};
+use super::{excercise::existing_file::ExistingFile, file_data::FileData};
 
 pub trait DeleteSelection {
-    fn select_files_to_delete<I: Iterator<Item = FileData>>(self: &Self, client: &Client, preselect_setting: PreselectDeleteSetting, file_data: &I) -> Result<Box<dyn Iterator<Item = ExistingFile>>> where I: Clone;
+    type UploadedFile;
+    fn select_files_to_delete<'a, I: Iterator<Item = FileData>>(
+        self: &'a Self,
+        preselect_setting: PreselectDeleteSetting,
+        file_data: &I,
+        conflicting_files: &'a [Self::UploadedFile],
+    ) -> Result<Box<dyn Iterator<Item = ExistingFile> + '_>>
+    where
+        I: Clone;
 }

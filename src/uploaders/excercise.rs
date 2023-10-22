@@ -1,7 +1,7 @@
 pub mod existing_file;
-use std::{error::Error, fmt::Debug};
+use std::fmt::Debug;
 
-use anyhow::Result;
+use anyhow::{Result, Context, anyhow};
 use dialoguer::{MultiSelect, theme::ColorfulTheme};
 use reqwest::{
     blocking::{multipart::Form, Client},
@@ -19,8 +19,8 @@ use super::{upload_provider::UploadProvider, file_data::FileData, delete_selecti
 pub struct Excercise {
     pub active: bool,
     pub name: String,
-    pub has_files: bool,
-    submit_url: Option<Url>,
+    has_files: bool,
+    submit_url: Url,
     overview_page: Option<Html>,
 }
 
@@ -30,9 +30,9 @@ impl Excercise {
         client: &Client,
         excercise: ElementRef<'_>,
         base_url: Url,
-    ) -> Result<Excercise, Box<dyn Error>> {
+    ) -> Result<Excercise> {
         let mut raw = Self::parse_from(excercise, base_url)?;
-        let overview_page = raw.get_overview_page(client).unwrap();
+        let overview_page = raw.get_overview_page(client)?;
         {
             let ref mut this = raw;
             this.overview_page = Some(overview_page);
@@ -40,31 +40,31 @@ impl Excercise {
         Ok(raw)
     }
 
-    pub fn parse_from(excercise: ElementRef, base_url: Url) -> Result<Excercise, Box<dyn Error>> {
-        let name_selector = Selector::parse(r#".il_VAccordionHead span.ilAssignmentHeader"#)?;
+    pub fn parse_from(excercise: ElementRef, base_url: Url) -> Result<Excercise> {
+        let name_selector = Selector::parse(r#".il_VAccordionHead span.ilAssignmentHeader"#).or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
         let name = excercise
             .select(&name_selector)
-            .next()
-            .unwrap()
+            .next().context("Did not find name for execise")?
             .text()
             .collect();
 
-        let submit_button_selector = Selector::parse(r#"a.btn.btn-default.btn-primary"#).unwrap();
+        let submit_button_selector = Selector::parse(r#"a.btn.btn-default.btn-primary"#).or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
         let button = excercise.select(&submit_button_selector).next();
 
         let mut url = base_url.clone();
 
-        let (has_files, subit_url) = match button {
+        let (has_files, subit_url_option) = match button {
             Some(submit_button) => {
-                let querypath = submit_button.value().attr("href").unwrap().to_string();
+                let querypath = submit_button.value().attr("href").context("Did not find href")?;
                 let mut parts = querypath.split("?");
-                let path = parts.next().unwrap();
+                let path = parts.next().context("Did not get any parts")?;
                 let query = parts.next();
 
                 url.set_path(path);
                 url.set_query(query);
 
                 (
+                    // TODO: Improve
                     submit_button.text().collect::<String>().contains("Lösung"),
                     Some(url),
                 )
@@ -73,21 +73,24 @@ impl Excercise {
         };
 
         Ok(Excercise {
-            active: subit_url.is_some(),
-            submit_url: subit_url,
+            active: subit_url_option.is_some(),
+            submit_url: match subit_url_option {
+                Some(url) => url,
+                None => url,
+            },
             has_files: has_files,
             name: name,
             overview_page: None,
         })
     }
 
-    fn get_overview_page(&self, client: &Client) -> Option<Html> {
-        if self.overview_page.is_some() {
-            self.overview_page.clone()
+    fn get_overview_page(&self, client: &Client) -> Result<Html> {
+        if let Some(page) = self.overview_page {
+            Ok(page)
         } else {
-            let response = client.get(self.submit_url.clone().unwrap()).send().unwrap();
+            let response = client.get(self.submit_url).send().unwrap();
 
-            Some(Html::parse_document(response.text().unwrap().as_str()))
+            Ok(Html::parse_document(response.text()?.as_str()))
         }
     }
 }
@@ -113,7 +116,7 @@ impl UploadProvider for Excercise {
             .attr("data-action")
             .unwrap();
 
-        let url = set_querypath(self.submit_url.clone().unwrap(), upload_querypath);
+        let url = set_querypath(self.submit_url, upload_querypath);
 
         let upload_page = client.post(url.clone()).send().unwrap();
         let form_selector = Selector::parse(r#"div#ilContentContainer form"#).unwrap();
@@ -134,6 +137,9 @@ impl UploadProvider for Excercise {
 
 
     fn get_conflicting_files(self: &Self, client: &Client) -> Vec<ExistingFile> {
+        if !self.has_files {
+            return vec![];
+        }
         let page = self.get_overview_page(&client).unwrap();
         let files = ExistingFile::parse_uploaded_files(&page);
         return files;
@@ -151,7 +157,7 @@ impl UploadProvider for Excercise {
             .attr("action")
             .unwrap();
 
-        let url = set_querypath(self.submit_url.clone().unwrap(), delete_querypath);
+        let url = set_querypath(self.submit_url, delete_querypath);
 
         let mut form_args = ids.map(|id| ("delivered[]", id)).collect::<Vec<_>>();
         form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));
@@ -161,9 +167,10 @@ impl UploadProvider for Excercise {
 }
 
 impl DeleteSelection for Excercise {
-    fn select_files_to_delete<I: Iterator<Item = FileData>>(self: &Self, client: &Client, preselect_setting: PreselectDeleteSetting, file_data: &I) -> Result<Box<dyn Iterator<Item = ExistingFile>>> where I: Clone {
-        let files = self.get_conflicting_files(&client);
-            let mapped_files: Vec<(&str, bool)> = files
+    type UploadedFile = ExistingFile;
+
+    fn select_files_to_delete<'a, I: Iterator<Item = FileData>>(self: &'a Self, preselect_setting: PreselectDeleteSetting, file_data: &I, conflicting_files: &'a [Self::UploadedFile]) -> Result<Box<dyn Iterator<Item = ExistingFile> + '_>> where I: Clone {
+            let mapped_files: Vec<(&str, bool)> = conflicting_files
                 .iter()
                 .map(|file| {
                     (
@@ -185,7 +192,7 @@ impl DeleteSelection for Excercise {
                 .items_checked(&mapped_files)
                 .interact()?
                 .into_iter()
-                .map(move |index| files[index].clone());
-            return Ok(Box::from(selection));
+                .map(move |index| conflicting_files[index].clone());
+            return Ok(Box::new(selection));
     }
 }

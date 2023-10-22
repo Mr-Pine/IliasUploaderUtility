@@ -20,7 +20,9 @@ use crate::{
     config::Config,
     course::Course,
     transform::Transformer,
-    uploaders::{file_data::FileData, upload_provider::UploadProvider, delete_selection::DeleteSelection},
+    uploaders::{
+        delete_selection::DeleteSelection, file_data::FileData, upload_provider::UploadProvider,
+    },
 };
 
 fn main() -> Result<()> {
@@ -117,7 +119,8 @@ fn main() -> Result<()> {
         path: path.to_string(),
     });
 
-    if selected_excercise.has_files {
+    let conflicting_files = selected_excercise.get_conflicting_files(&reqwest_client);
+    if !conflicting_files.is_empty() {
         let delete = Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt("This excercise already has uploaded files. Do you want to delete them?")
             .default(true)
@@ -125,7 +128,11 @@ fn main() -> Result<()> {
             .unwrap();
 
         if delete {
-            let selection = selected_excercise.select_files_to_delete(&reqwest_client, preselect_delete_setting, &transformed_file_data);
+            let selection = selected_excercise.select_files_to_delete(
+                preselect_delete_setting,
+                &transformed_file_data,
+                &conflicting_files,
+            );
             selected_excercise.delete_files(&reqwest_client, selection?)
         }
     }
