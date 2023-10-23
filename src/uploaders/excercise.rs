@@ -66,7 +66,7 @@ impl Excercise {
                 (
                     // TODO: Improve
                     submit_button.text().collect::<String>().contains("Lösung"),
-                    Some(url),
+                    Some(url.clone()),
                 )
             }
             None => (false, None),
@@ -85,10 +85,10 @@ impl Excercise {
     }
 
     fn get_overview_page(&self, client: &Client) -> Result<Html> {
-        if let Some(page) = self.overview_page {
-            Ok(page)
+        if let Some(page) = &self.overview_page {
+            Ok(page.clone())
         } else {
-            let response = client.get(self.submit_url).send().unwrap();
+            let response = client.get(self.submit_url.clone()).send().unwrap();
 
             Ok(Html::parse_document(response.text()?.as_str()))
         }
@@ -116,7 +116,7 @@ impl UploadProvider for Excercise {
             .attr("data-action")
             .unwrap();
 
-        let url = set_querypath(self.submit_url, upload_querypath);
+        let url = set_querypath(self.submit_url.clone(), upload_querypath);
 
         let upload_page = client.post(url.clone()).send().unwrap();
         let form_selector = Selector::parse(r#"div#ilContentContainer form"#).unwrap();
@@ -157,7 +157,7 @@ impl UploadProvider for Excercise {
             .attr("action")
             .unwrap();
 
-        let url = set_querypath(self.submit_url, delete_querypath);
+        let url = set_querypath(self.submit_url.clone(), delete_querypath);
 
         let mut form_args = ids.map(|id| ("delivered[]", id)).collect::<Vec<_>>();
         form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));

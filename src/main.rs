@@ -21,7 +21,7 @@ use crate::{
     course::Course,
     transform::Transformer,
     uploaders::{
-        delete_selection::DeleteSelection, file_data::FileData, upload_provider::UploadProvider,
+        delete_selection::DeleteSelection, file_data::FileData, upload_provider::UploadProvider, ilias_folder::IliasFolder,
     },
 };
 
@@ -80,6 +80,13 @@ fn main() -> Result<()> {
 
     let reqwest_client = Client::builder().cookie_store(true).build().unwrap();
     authenticate(&reqwest_client, &username, &password).unwrap();
+
+
+    // TODO: Remove
+    println!("Test folder");
+    let folder = dbg!(IliasFolder::from_id(&reqwest_client, "2240661"));
+
+
     let target = Course::from_id(&reqwest_client, &ilias_id, "unknown").unwrap();
 
     let active_excercises: Vec<_> = target
