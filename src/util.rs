@@ -1,4 +1,6 @@
+use clap::ValueEnum;
 use reqwest::Url;
+use serde::Deserialize;
 
 pub const ILIAS_URL: &str = "https://ilias.studium.kit.edu";
 
@@ -28,6 +30,8 @@ impl SetQuerypath for Url {
     }   
 }
 
+#[derive(Debug, Deserialize, Clone, ValueEnum, PartialEq)]
+#[clap(rename_all = "kebab_case")]
 pub enum UploadType {
     EXERCISE, FOLDER
 }

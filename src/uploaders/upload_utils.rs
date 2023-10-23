@@ -1,5 +1,5 @@
 use anyhow::{Result, Ok};
-use reqwest::{blocking::{Client, multipart::Form}, IntoUrl, Url};
+use reqwest::{blocking::{Client, multipart::Form}, Url};
 
 use crate::uploaders::file_with_filename::AddFileWithFilename;
 
@@ -14,6 +14,7 @@ pub fn upload_files_to_url<I: Iterator<Item = FileData>>(client: &Client, file_d
         }
     
 
-        client.post(target).multipart(form).send()?;
+        let result = client.post(target).multipart(form).send()?;
+        dbg!(result);
         Ok(())
 }

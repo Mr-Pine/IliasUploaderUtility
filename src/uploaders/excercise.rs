@@ -13,7 +13,7 @@ use crate::{util::SetQuerypath, preselect_delete_setting::PreselectDeleteSetting
 
 use self::existing_file::ExistingFile;
 
-use super::{upload_provider::UploadProvider, file_data::FileData, delete_selection::DeleteSelection, upload_utils::upload_files_to_url};
+use super::{upload_provider::UploadProvider, file_data::FileData, upload_utils::upload_files_to_url};
 
 #[derive(Debug)]
 pub struct Excercise {
@@ -157,10 +157,6 @@ impl UploadProvider for Excercise {
         let _confirm_response = client.post(url.clone()).form(&form_args).send()?;
         Ok(())
     }
-}
-
-impl DeleteSelection for Excercise {
-    type UploadedFile = ExistingFile;
 
     fn select_files_to_delete<'a, I: Iterator<Item = FileData>>(self: &'a Self, preselect_setting: PreselectDeleteSetting, file_data: &I, conflicting_files: &'a [Self::UploadedFile]) -> Result<Box<dyn Iterator<Item = ExistingFile> + '_>> where I: Clone {
             let mapped_files: Vec<(&str, bool)> = conflicting_files

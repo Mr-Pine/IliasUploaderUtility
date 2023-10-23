@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use crate::preselect_delete_setting::PreselectDeleteSetting;
+use crate::{preselect_delete_setting::PreselectDeleteSetting, util::UploadType};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -24,5 +24,8 @@ pub struct Arguments {
     pub store_password: bool,
 
     #[arg(long, value_enum)]
-    pub preselect_delete: Option<PreselectDeleteSetting>
+    pub preselect_delete: Option<PreselectDeleteSetting>,
+
+    #[arg(long, value_enum)]
+    pub upload_type: Option<UploadType>
 }
