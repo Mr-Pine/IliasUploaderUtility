@@ -1040,7 +1040,7 @@ dependencies = [
 
 [[package]]
 name = "ilias_uploader_utility"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "clap",

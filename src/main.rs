@@ -6,6 +6,7 @@ use dialoguer::{theme::ColorfulTheme, Confirm, Password, Select};
 use keyring::Entry;
 use preselect_delete_setting::PreselectDeleteSetting;
 use reqwest::blocking::Client;
+use util::UploadType;
 
 mod arguments;
 mod authentication;
@@ -132,6 +133,7 @@ fn main() -> Result<()> {
                 &reqwest_client,
                 selected_excercise,
                 transformed_file_data,
+                upload_type,
                 preselect_delete_setting,
             )
         }
@@ -141,6 +143,7 @@ fn main() -> Result<()> {
                 &reqwest_client,
                 &target,
                 transformed_file_data,
+                upload_type,
                 preselect_delete_setting,
             )
         }
@@ -151,15 +154,16 @@ fn upload_files<T: UploadProvider, I: Iterator<Item = FileData>>(
     client: &Client,
     target: &T,
     transformed_files: I,
+    upload_type: UploadType, 
     preselect_delete_setting: PreselectDeleteSetting,
 ) -> Result<()>
 where
     I: Clone,
 {
-    let conflicting_files = target.get_conflicting_files(&client);
+    let conflicting_files = target.get_conflicting_files(&client, transformed_files.clone().map(|data| data.name));
     if !conflicting_files.is_empty() {
         let delete = Confirm::with_theme(&ColorfulTheme::default())
-            .with_prompt("This excercise already has uploaded files. Do you want to delete them?")
+            .with_prompt(upload_type.get_delete_message())
             .default(true)
             .interact()
             .unwrap();

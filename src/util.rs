@@ -43,4 +43,11 @@ impl UploadType {
             UploadType::FOLDER => "fold",
         }
     }
+
+    pub fn get_delete_message(self: &Self) -> &str{
+        match self {
+            UploadType::EXERCISE => "This excercise already has uploaded files. Do you want to delete them?",
+            UploadType::FOLDER => "There are files with the same name in this folder. Do you want to delete them?",
+        }
+    }
 }

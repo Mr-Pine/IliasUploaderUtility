@@ -8,7 +8,7 @@ use super::file_data::FileData;
 pub trait UploadProvider {
     type UploadedFile;
     fn upload_files<I: Iterator<Item = FileData>>(&self, client: &Client, file_data_iter: I) -> Result<()>;
-    fn get_conflicting_files(self: &Self, client: &Client) -> Vec<Self::UploadedFile>;
+    fn get_conflicting_files<I: IntoIterator<Item = String>>(self: &Self, client: &Client, filenames: I) -> Vec<Self::UploadedFile> where I: Clone;
     fn delete_files<I: IntoIterator<Item = Self::UploadedFile>>(self: &Self, client: &Client, files: I) -> Result<()>;
     fn select_files_to_delete<'a, I: Iterator<Item = FileData>>(
         self: &'a Self,

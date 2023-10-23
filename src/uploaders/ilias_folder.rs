@@ -1,12 +1,14 @@
-use std::iter::empty;
-
 use anyhow::{anyhow, Context, Ok, Result};
-use reqwest::{blocking::Client, Url};
+use regex::Regex;
+use reqwest::{
+    blocking::{multipart::Form, Client},
+    Url,
+};
 use scraper::{Html, Selector};
 
 use crate::{
     ilias_url,
-    uploaders::upload_utils::upload_files_to_url,
+    uploaders::{file_with_filename::AddFileWithFilename, existing_file::ExistingFile},
     util::{SetQuerypath, UploadType},
 };
 
@@ -14,6 +16,7 @@ use super::upload_provider::UploadProvider;
 
 #[derive(Debug)]
 pub struct IliasFolder {
+    id: String,
     base_url: Url,
     page: Html,
 }
@@ -27,14 +30,38 @@ impl IliasFolder {
         let page = Html::parse_document(html_source.as_str());
 
         Ok(IliasFolder {
+            id: id.to_string(),
             base_url: base_url,
             page: page,
         })
     }
+
+    fn delete_file(self: &Self, client: &Client, file: ExistingFile) -> Result<()> {
+        let delete_page_url = Url::parse(format!("https://ilias.studium.kit.edu/ilias.php?ref_id={}&item_ref_id={}&cmd=delete&cmdClass=ilobjfoldergui&cmdNode=x1:nk&baseClass=ilrepositorygui", self.id, file.id).as_str())?;
+        let delete_page_response = client.get(delete_page_url).send()?;
+        let delete_page = Html::parse_document(delete_page_response.text()?.as_str());
+
+        let form_selector = Selector::parse("main form").unwrap();
+        let confirm_querypath = delete_page
+            .select(&form_selector)
+            .next()
+            .unwrap()
+            .value()
+            .attr("action")
+            .unwrap();
+
+        let mut url = self.base_url.clone();
+        url.set_querypath(confirm_querypath);
+
+        let form_data = [("id[]", file.id.as_str()),("cmd[confirmedDelete]", "I fucking hate ILIAS")];
+
+        client.post(url).form(&form_data).send()?;
+        Ok(())
+    }
 }
 
 impl UploadProvider for IliasFolder {
-    type UploadedFile = ();
+    type UploadedFile = ExistingFile;
 
     fn upload_files<I: Iterator<Item = super::file_data::FileData>>(
         &self,
@@ -43,8 +70,6 @@ impl UploadProvider for IliasFolder {
     ) -> Result<()> {
         let upload_file_page_selecor = Selector::parse(r#"#il-add-new-item-gl #file"#)
             .or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
-
-        println!("{}", self.page.html());
 
         let upload_file_element = self
             .page
@@ -68,11 +93,11 @@ impl UploadProvider for IliasFolder {
         let upload_page_response = client.get(upload_page_url).send()?;
         let upload_page = Html::parse_document(upload_page_response.text()?.as_str());
 
-        let upload_link_selector = Selector::parse("#form_")
+        let upload_form_selector = Selector::parse("#form_")
             .or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
 
         let upload_querypath = upload_page
-            .select(&upload_link_selector)
+            .select(&upload_form_selector)
             .next()
             .unwrap()
             .value()
@@ -82,11 +107,41 @@ impl UploadProvider for IliasFolder {
         let mut url = self.base_url.clone();
         url.set_querypath(upload_querypath);
 
-        upload_files_to_url(&client, file_data_iter, url)
+        for file_data in file_data_iter {
+            let mut form = Form::new();
+
+            form = form.file_with_name(
+                "upload_files",
+                file_data.path,
+                file_data.name.clone(),
+            )?.text("title", file_data.name);
+
+            client.post(url.clone()).multipart(form).send()?;
+        }
+
+        Ok(())
     }
 
-    fn get_conflicting_files(self: &Self, client: &Client) -> Vec<Self::UploadedFile> {
-        vec![]
+    fn get_conflicting_files<I: IntoIterator<Item = String>>(self: &Self, _client: &Client, filenames: I) -> Vec<Self::UploadedFile> where I: Clone {
+        let file_link_selector = Selector::parse("a.il_ContainerItemTitle").unwrap();
+        let file_property_selector = Selector::parse(".il_ItemProperties span").unwrap();
+        let file_row_selector = Selector::parse("div.ilContainerListItemOuter").unwrap();
+        let file_id_regex = Regex::new("lg_div_(?P<id>\\d+)_pref_\\d+").unwrap();
+        let file_rows = self.page.select(&file_row_selector);
+        let files = file_rows.map(|row| {
+            let file_link = row.select(&file_link_selector).next().unwrap();
+            let element_id = row.value().id().unwrap();
+            let id = file_id_regex.replace(element_id, "$id");
+            let filename = file_link.text().next().unwrap();
+            let filetype = row.select(&file_property_selector).next().unwrap().text().next().unwrap().trim();
+            
+            let filename = format!("{}.{}", filename, filetype);
+            ExistingFile {
+                name: filename,
+                id: id.to_string()
+            }
+        });
+        return files.filter(|file| filenames.clone().into_iter().collect::<Vec<_>>().contains(&file.name)).collect();
     }
 
     fn delete_files<I: IntoIterator<Item = Self::UploadedFile>>(
@@ -94,20 +149,22 @@ impl UploadProvider for IliasFolder {
         client: &Client,
         files: I,
     ) -> Result<()> {
-        //todo!();
+        for file in files.into_iter() {
+            self.delete_file(client, file)?;
+        };
+        println!("Successfully deleted other files");
         Ok(())
     }
 
     fn select_files_to_delete<'a, I: Iterator<Item = super::file_data::FileData>>(
         self: &'a Self,
-        preselect_setting: crate::preselect_delete_setting::PreselectDeleteSetting,
-        file_data: &I,
+        _preselect_setting: crate::preselect_delete_setting::PreselectDeleteSetting,
+        _file_data: &I,
         conflicting_files: &'a [Self::UploadedFile],
-    ) -> Result<Box<dyn Iterator<Item = ()> + '_>>
+    ) -> Result<Box<dyn Iterator<Item = Self::UploadedFile> + '_>>
     where
         I: Clone,
     {
-        let vec: Vec<()> = vec![];
-        return Ok(Box::new(empty()));
+        return Ok(Box::new(conflicting_files.iter().map(|f| f.clone())));
     }
 }
