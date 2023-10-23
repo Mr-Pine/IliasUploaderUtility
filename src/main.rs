@@ -140,7 +140,7 @@ fn main() -> Result<()> {
                 &transformed_file_data,
                 &conflicting_files,
             );
-            selected_excercise.delete_files(&reqwest_client, selection?)
+            selected_excercise.delete_files(&reqwest_client, selection?);
         }
     }
 

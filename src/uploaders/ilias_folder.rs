@@ -1,14 +1,14 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context, Result, Ok};
 use reqwest::{blocking::Client, Url};
 use scraper::{Html, Selector};
 
-use crate::{ilias_url, util::UploadType};
+use crate::{ilias_url, util::{UploadType, SetQuerypath}, uploaders::upload_utils::upload_files_to_url};
 
 use super::upload_provider::UploadProvider;
 
 #[derive(Debug)]
 pub struct IliasFolder {
-    file_upload_url: Url,
+    base_url: Url,
     page: Html,
 }
 
@@ -21,31 +21,8 @@ impl IliasFolder {
         println!("{}", html_source.as_str());
         let page = Html::parse_document(html_source.as_str());
 
-
-        let upload_file_page_selecor = Selector::parse(r#"#il-add-new-item-gl #file"#)
-            .or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
-        let upload_file_element = page
-            .select(&upload_file_page_selecor)
-            .next()
-            .context("Did not find link")?;
-
-        let mut upload_url = base_url.clone();
-
-        let querypath = upload_file_element
-            .value()
-            .attr("href")
-            .context("Did not find href")?;
-        let mut parts = querypath.split("?");
-        let path = parts.next().context("Did not get any parts")?;
-        let query = parts.next();
-
-        upload_url.set_path(path);
-        upload_url.set_query(query);
-
-        dbg!(&upload_url);
-
         Ok(IliasFolder {
-            file_upload_url: Url::parse(format!("{}", id).as_str())?,
+            base_url: base_url,
             page: page,
         })
     }
@@ -58,8 +35,48 @@ impl UploadProvider for IliasFolder {
         &self,
         client: &Client,
         file_data_iter: I,
-    ) {
-        todo!()
+    ) -> Result<()> {
+        let upload_file_page_selecor = Selector::parse(r#"#il-add-new-item-gl #file"#)
+            .or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
+        let upload_file_element = self
+            .page
+            .select(&upload_file_page_selecor)
+            .next()
+            .context("Did not find link")?;
+
+        let mut upload_page_url = self.base_url.clone();
+
+        let querypath = upload_file_element
+            .value()
+            .attr("href")
+            .context("Did not find href")?;
+        let mut parts = querypath.split("?");
+        let path = parts.next().context("Did not get any parts")?;
+        let query = parts.next();
+
+        upload_page_url.set_path(path);
+        upload_page_url.set_query(query);
+
+        dbg!(&upload_page_url);
+
+        let upload_page_response = client.get(upload_page_url).send()?;
+        let upload_page = Html::parse_document(upload_page_response.text()?.as_str());
+
+        let upload_link_selector = Selector::parse("#form_")
+        .or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
+        
+        let upload_querypath = upload_page
+            .select(&upload_link_selector)
+            .next()
+            .unwrap()
+            .value()
+            .attr("action")
+            .unwrap();
+
+        let mut url = self.base_url.clone();
+        url.set_querypath(upload_querypath);
+
+        upload_files_to_url(&client, file_data_iter, url)
     }
 
     fn get_conflicting_files(self: &Self, client: &Client) -> Vec<Self::UploadedFile> {
@@ -70,7 +87,8 @@ impl UploadProvider for IliasFolder {
         self: &Self,
         client: &Client,
         files: I,
-    ) {
-        todo!()
+    ) -> Result<()> {
+        todo!();
+        Ok(())
     }
 }

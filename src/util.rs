@@ -16,12 +16,16 @@ macro_rules! ilias_url {
     };
 }
 
-pub fn set_querypath(mut url: Url, querypath: &str) -> Url {
-    let mut parts = querypath.split("?");
-    url.set_path(parts.next().unwrap());
-    url.set_query(parts.next());
+pub trait SetQuerypath {
+    fn set_querypath(self: &mut Self, querypath: &str);
+}
 
-    url
+impl SetQuerypath for Url {
+    fn set_querypath(self: &mut Self, querypath: &str) {
+        let mut parts = querypath.split("?");
+        self.set_path(parts.next().unwrap());
+        self.set_query(parts.next());
+    }   
 }
 
 pub enum UploadType {
