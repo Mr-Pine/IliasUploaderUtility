@@ -9,6 +9,7 @@ Either
 - download the binary from the releases page
 - Clone the repo and run `cargo install` (obviously requires [cargo](https://github.com/rust-lang/cargo))
 If you are on windows you can also add a context menu entry `upload to ilias` to the explorer by executing [`windows_contextmenu.reg`](./windows_contextmenu.reg)
+- Use nix flakes: `nix run github:Mr-Pine/IliasUploaderUtility`
 
 ## Usage
 #### CLI
