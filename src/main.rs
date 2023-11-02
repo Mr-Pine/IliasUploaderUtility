@@ -1,4 +1,7 @@
-use std::{env, fs, path::PathBuf};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
@@ -95,13 +98,16 @@ fn main() -> Result<()> {
     let transformer = Transformer::new(transform_regex, transform_format)?;
 
     let transformed_file_data = cli_args.file_paths.iter().map(|path| FileData {
-        name: match &transformer {
-            Some(transformer) => transformer
-                .transform_path(path)
-                .unwrap()
-                .to_string_lossy()
-                .into_owned(),
-            None => path.to_string(),
+        name: match match &transformer {
+            Some(transformer) => transformer.transform(path),
+            None => None,
+        } {
+            Some(transformed) => transformed,
+            None => Path::new(path)
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned()
         },
         path: path.to_string(),
     });
@@ -154,13 +160,14 @@ fn upload_files<T: UploadProvider, I: Iterator<Item = FileData>>(
     client: &Client,
     target: &T,
     transformed_files: I,
-    upload_type: UploadType, 
+    upload_type: UploadType,
     preselect_delete_setting: PreselectDeleteSetting,
 ) -> Result<()>
 where
     I: Clone,
 {
-    let conflicting_files = target.get_conflicting_files(&client, transformed_files.clone().map(|data| data.name));
+    let conflicting_files =
+        target.get_conflicting_files(&client, transformed_files.clone().map(|data| data.name));
     if !conflicting_files.is_empty() {
         let delete = Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt(upload_type.get_delete_message())

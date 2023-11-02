@@ -1,5 +1,3 @@
-use std::path::{Path, PathBuf};
-
 use anyhow::{Context, Result};
 use regex::Regex;
 
@@ -28,20 +26,17 @@ impl Transformer {
     pub fn transform(
         self: &Self,
         filename: &str,
-    ) -> String {
+    ) -> Option<String> {
+        let matches = self.regex.is_match(filename);
+        if !matches {
+            return None;
+        }
         let transformed_filename = self.regex.replace_all(
             filename,
             self.format.clone(),
         );
     
-        return transformed_filename.into_owned();
-    }
-
-    pub fn transform_path<T: AsRef<Path>>(self: &Self, path: T) -> Result<PathBuf> {
-        let path = path.as_ref();
-        let filename = path.file_name().context("Unable to get filename")?;
-        let transformed_filename = self.transform(filename.to_str().context("Can't transform filename to string")?);
-        return Ok(path.with_file_name(transformed_filename));
+        return Some(transformed_filename.into_owned());
     }
         
 }
