@@ -114,7 +114,10 @@ impl UploadProvider for IliasFolder {
                 "upload_files",
                 file_data.path,
                 file_data.name.clone(),
-            )?.text("title", file_data.name);
+            )?
+            .text("title", file_data.name)
+            .text("cmd[uploadFile]", "Hochladen")
+            .text("ilfilehash", "aaaa");
 
             client.post(url.clone()).multipart(form).send()?;
         }

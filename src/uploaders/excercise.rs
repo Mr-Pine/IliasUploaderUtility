@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use anyhow::{anyhow, Context, Ok, Result};
 use dialoguer::{theme::ColorfulTheme, MultiSelect};
 use reqwest::{
-    blocking::{multipart::{Form, Part}, Client},
+    blocking::{multipart::Form, Client},
     Url,
 };
 use scraper::{ElementRef, Html, Selector};
@@ -166,10 +166,10 @@ impl UploadProvider for Excercise {
                 file_data.path,
                 file_data.name,
             )?
-            .part("cmd[uploadFile]", Part::text("Hochladen"))
-            .part("ilfilehash", Part::text("aaaa"));
+            .text("cmd[uploadFile]", "Hochladen")
+            .text("ilfilehash", "aaaa");
         }
-client.post(url).multipart(form).send()?;
+client.post(dbg!(url)).multipart(dbg!(form)).send()?;
         Ok(())
     }
 
