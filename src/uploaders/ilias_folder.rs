@@ -1,14 +1,14 @@
 use anyhow::{anyhow, Context, Ok, Result};
 use regex::Regex;
 use reqwest::{
-    blocking::{multipart::Form, Client},
-    Url,
+    blocking::{multipart::Form, Client}, Url
 };
 use scraper::{Html, Selector};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     ilias_url,
-    uploaders::{file_with_filename::AddFileWithFilename, existing_file::ExistingFile},
+    uploaders::existing_file::ExistingFile,
     util::{SetQuerypath, UploadType},
 };
 
@@ -19,6 +19,13 @@ pub struct IliasFolder {
     id: String,
     base_url: Url,
     page: Html,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IliasUploadResponse {
+    status: u8,
+    message: String,
+    file_id: String
 }
 
 impl IliasFolder {
@@ -93,10 +100,10 @@ impl UploadProvider for IliasFolder {
         let upload_page_response = client.get(upload_page_url).send()?;
         let upload_page = Html::parse_document(upload_page_response.text()?.as_str());
 
-        let upload_form_selector = Selector::parse("#form_")
+        let upload_form_selector = Selector::parse("main form")
             .or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
 
-        let upload_querypath = upload_page
+        let finish_upload_querypath = upload_page
             .select(&upload_form_selector)
             .next()
             .unwrap()
@@ -104,22 +111,36 @@ impl UploadProvider for IliasFolder {
             .attr("action")
             .unwrap();
 
+        let script_tag_selector = Selector::parse("body script:not([src])")
+            .or_else(|err| Err(anyhow!("Could not parse scraper: {:?}", err)))?;
+        let relevant_script_tag = upload_page
+            .select(&script_tag_selector)
+            .next()
+            .unwrap()
+            .text()
+            .collect::<String>();
+
+        let path_regex = Regex::new(r".*il\.UI\.Input\.File\.init\([^']*'[^']*',[^']*'(?<querypath>[^']+)'.*").expect("cursed regex lol");
+        let upload_querypath = &path_regex.captures(&relevant_script_tag).expect("no match found :()")["querypath"];
+
         let mut url = self.base_url.clone();
         url.set_querypath(upload_querypath);
 
         for file_data in file_data_iter {
-            let mut form = Form::new();
+            let form = Form::new()
+                .file("file[0]", file_data.path)?;
 
-            form = form.file_with_name(
-                "upload_files",
-                file_data.path,
-                file_data.name.clone(),
-            )?
-            .text("title", file_data.name)
-            .text("cmd[uploadFile]", "Hochladen")
-            .text("ilfilehash", "aaaa");
+            let response: IliasUploadResponse = client.post(url.clone()).multipart(form).send()?.json()?;
+            let file_id = response.file_id;
 
-            client.post(url.clone()).multipart(form).send()?;
+            let finish_form = Form::new()
+                .text("form/input_0[input_1][]", file_data.name.clone())
+                .text("form/input_0[input_2][]", "")
+                .text("form/input_0[input_3][]", file_id)
+                .percent_encode_noop();
+
+            url.set_querypath(finish_upload_querypath);
+            client.post(url.clone()).multipart(finish_form).send()?;
         }
 
         Ok(())
@@ -137,7 +158,7 @@ impl UploadProvider for IliasFolder {
             let id = file_id_regex.replace(element_id, "$id");
             let filename = file_link.text().next().unwrap();
             let filetype = row.select(&file_property_selector).next().unwrap().text().next().unwrap().trim();
-            
+
             let filename = format!("{}.{}", filename, filetype);
             ExistingFile {
                 name: filename,

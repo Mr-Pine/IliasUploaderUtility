@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reqwest ={version =  "0.11.22", features = ["cookies", "multipart", "blocking"]}
+reqwest ={version =  "0.11.22", features = ["cookies", "multipart", "blocking", "json"]}
 scraper = "0.17.1"
 clap = { version = "4.4.6", features = ["derive"] }
 dialoguer = "0.11.0"
