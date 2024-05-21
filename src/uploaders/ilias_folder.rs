@@ -44,7 +44,7 @@ impl IliasFolder {
     }
 
     fn delete_file(self: &Self, client: &Client, file: ExistingFile) -> Result<()> {
-        let delete_page_url = Url::parse(format!("https://ilias.studium.kit.edu/ilias.php?ref_id={}&item_ref_id={}&cmd=delete&cmdClass=ilobjfoldergui&cmdNode=x1:nk&baseClass=ilrepositorygui", self.id, file.id).as_str())?;
+        let delete_page_url = Url::parse(format!("https://ilias.studium.kit.edu/ilias.php?ref_id={}&item_ref_id={}&cmd=delete&cmdClass=ilobjfoldergui&cmdNode=xe:mj&baseClass=ilrepositorygui", self.id, file.id).as_str())?;
         let delete_page_response = client.get(delete_page_url).send()?;
         let delete_page = Html::parse_document(delete_page_response.text()?.as_str());
 
