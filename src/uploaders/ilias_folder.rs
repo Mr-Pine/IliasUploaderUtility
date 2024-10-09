@@ -3,7 +3,7 @@ use regex::Regex;
 use reqwest::{
     blocking::{multipart::Form, Client}, Url
 };
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -152,19 +152,7 @@ impl UploadProvider for IliasFolder {
         let file_row_selector = Selector::parse("div.ilContainerListItemOuter").unwrap();
         let file_id_regex = Regex::new("lg_div_(?P<id>\\d+)_pref_\\d+").unwrap();
         let file_rows = self.page.select(&file_row_selector);
-        let files = file_rows.map(|row| {
-            let file_link = row.select(&file_link_selector).next().unwrap();
-            let element_id = row.value().id().unwrap();
-            let id = file_id_regex.replace(element_id, "$id");
-            let filename = file_link.text().next().unwrap();
-            let filetype = row.select(&file_property_selector).next().unwrap().text().next().unwrap().trim();
-
-            let filename = format!("{}.{}", filename, filetype);
-            ExistingFile {
-                name: filename,
-                id: id.to_string()
-            }
-        });
+        let files = file_rows.filter_map(|row| get_file_from_row(row, &file_link_selector, &file_id_regex, &file_property_selector));
         return files.filter(|file| filenames.clone().into_iter().collect::<Vec<_>>().contains(&file.name)).collect();
     }
 
@@ -191,4 +179,18 @@ impl UploadProvider for IliasFolder {
     {
         return Ok(Box::new(conflicting_files.iter().map(|f| f.clone())));
     }
+}
+
+fn get_file_from_row(row: ElementRef<'_>, file_link_selector: &Selector, file_id_regex: &Regex, file_property_selector: &Selector) -> Option<ExistingFile> {
+        let file_link = row.select(file_link_selector).next()?;
+        let element_id = row.value().id()?;
+        let id = file_id_regex.replace(element_id, "$id");
+        let filename = file_link.text().next()?;
+        let filetype = row.select(&file_property_selector).next()?.text().next()?.trim();
+
+        let filename = format!("{}.{}", filename, filetype);
+        Some(ExistingFile {
+            name: filename,
+            id: id.to_string()
+        })
 }
