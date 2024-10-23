@@ -37,7 +37,11 @@ impl IliasElement for Assignment {
         "ass"
     }
 
-    fn parse(element: &scraper::ElementRef, ilias_client: &IliasClient) -> Result<Self> {
+    fn querypath_from_id(id: &str) -> String {
+        format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
+    }
+
+    fn parse(element: ElementRef, ilias_client: &IliasClient) -> Result<Self> {
         let name_selector = NAME_SELECTOR.get_or_init(|| {
             Selector::parse(".ilAssignmentHeader").expect("Could not parse selector")
         });
@@ -316,28 +320,29 @@ impl AssignmentSubmission {
         })
     }
 
-    pub fn delete_files<I: IntoIterator<Item = File>>(&self, ilias_client: &IliasClient, files: I) -> Result<()> {
-        let mut form_args = files.into_iter().map(|file| file.id.expect("Files to delete must have an id")).map(|id| ("delivered[]", id)).collect::<Vec<_>>();
+    pub fn delete_files(&self, ilias_client: &IliasClient, files: &[&File]) -> Result<()> {
+        let mut form_args = files.into_iter().map(|&file| file.id.clone().expect("Files to delete must have an id")).map(|id| ("delivered[]", id)).collect::<Vec<_>>();
         form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));
 
         ilias_client.post_querypath_form(&self.delete_querypath, &form_args)
     }
 
-    pub fn upload_files<I: IntoIterator<Item = FileData>>(&self, ilias_client: &IliasClient, files: I) -> Result<()> {
+    pub fn upload_files(&self, ilias_client: &IliasClient, files: &[FileData]) -> Result<()> {
         let mut form = Form::new();
 
 
-        for (index, file_data) in files.into_iter().enumerate() {
+        for (index, file_data) in files.iter().enumerate() {
             form = form.file_with_name(
                 format!("deliver[{}]", index),
-                file_data.path,
-                file_data.name,
+                file_data.path.clone(),
+                file_data.name.clone(),
             )?
             .text("cmd[uploadFile]", "Hochladen")
             .text("ilfilehash", "aaaa");
         }
 
-        ilias_client.post_querypath_multipart(&self.upload_querypath, form)
+        ilias_client.post_querypath_multipart(&self.upload_querypath, form)?;
+        Ok(())
         // TODO: Maybe push files to submission here
     }
 }

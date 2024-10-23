@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::{fmt::Display, sync::OnceLock};
 
 use anyhow::{Context, Result};
 use regex::Regex;
@@ -67,7 +67,11 @@ impl IliasElement for Folder {
         "fold"
     }
 
-    fn parse(element: &ElementRef, ilias_client: &super::client::IliasClient) -> Result<Self> {
+    fn querypath_from_id(id: &str) -> String {
+        format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
+    }
+
+    fn parse(element: ElementRef, ilias_client: &super::client::IliasClient) -> Result<Self> {
         let name_selector = NAME_SELECTOR.get_or_init(|| {
             Selector::parse(".il-page-content-header").expect("Could not parse selector")
         });
@@ -125,7 +129,7 @@ static MAIN_FORM_SELECTOR: OnceLock<Selector> = OnceLock::new();
 static SCRIPT_TAG_SELECTOR: OnceLock<Selector> = OnceLock::new();
 
 impl Folder {
-    pub fn upload_files<I: IntoIterator<Item = FileData>>(&self, ilias_client: &IliasClient, files: I) -> Result<()> {
+    pub fn upload_files(&self, ilias_client: &IliasClient, files: &[FileData]) -> Result<()> {
         let upload_page = ilias_client.get_querypath(&self.upload_page_querypath.clone().context("No upload available for this folder")?)?;
         let upload_form_selector = MAIN_FORM_SELECTOR.get_or_init(|| Selector::parse("main form")
             .expect("Could not parse scraper"));
@@ -152,7 +156,7 @@ impl Folder {
 
         for file_data in files {
             let form = Form::new()
-                .file("file[0]", file_data.path)?;
+                .file("file[0]", file_data.path.clone())?;
 
             let response: IliasUploadResponse = ilias_client.post_querypath_multipart(upload_querypath, form)?.json()?;
             let file_id = response.file_id;
@@ -326,5 +330,16 @@ impl FolderElement {
 
         ilias_client.post_querypath_form(confirm_querypath, &form_data);
         Ok(())
+    }
+}
+
+impl Display for FolderElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FolderElement::File { file, deletion_querypath: _ } => write!(f, "{}", file),
+            FolderElement::Exercise { name, description: _, id: _, querypath: _, deletion_querypath: _ } => write!(f, "Exercise {}", name),
+            FolderElement::Opencast { name, description: _, id: _, querypath: _, deletion_querypath: _ } => write!(f, "OpenCast {}", name),
+            FolderElement::Viewable { name, description: _, id: _, querypath: _, deletion_querypath: _ } => write!(f, "Folder(-like) {}", name)
+        }
     }
 }

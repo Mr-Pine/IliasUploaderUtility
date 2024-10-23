@@ -1,21 +1,21 @@
 use anyhow::Result;
-use reqwest::blocking::Client;
 
-use crate::preselect_delete_setting::PreselectDeleteSetting;
+use crate::{ilias::client::IliasClient, preselect_delete_setting::PreselectDeleteSetting};
 
 use super::file_data::FileData;
 
 pub trait UploadProvider {
-    type UploadedFile;
-    fn upload_files<I: Iterator<Item = FileData>>(&self, client: &Client, file_data_iter: I) -> Result<()>;
-    fn get_conflicting_files<I: IntoIterator<Item = String>>(self: &Self, client: &Client, filenames: I) -> Vec<Self::UploadedFile> where I: Clone;
-    fn delete_files<I: IntoIterator<Item = Self::UploadedFile>>(self: &Self, client: &Client, files: I) -> Result<()>;
-    fn select_files_to_delete<'a, I: Iterator<Item = FileData>>(
+    type UploadedFile: ToString;
+    fn upload_files(&self, ilias_client: &IliasClient, file_data: &[FileData]) -> Result<()>;
+    fn get_existing_files(self: &Self) -> Vec<&Self::UploadedFile>;
+    fn delete_files(self: &Self, ilias_client: &IliasClient, files: &[&Self::UploadedFile]) -> Result<()>;
+    fn preselect_files<'a>(&self, preselect_setting: PreselectDeleteSetting, upload_files: &[FileData], existing_files: Vec<&'a Self::UploadedFile>) -> Vec<(&'a Self::UploadedFile, bool)>;
+    /*fn select_files_to_delete<'a, I: Iterator<Item = FileData>>(
         self: &'a Self,
         preselect_setting: PreselectDeleteSetting,
         file_data: &I,
         conflicting_files: &'a [Self::UploadedFile],
     ) -> Result<Box<dyn Iterator<Item = Self::UploadedFile> + '_>>
     where
-        I: Clone;
+        I: Clone;*/
 }

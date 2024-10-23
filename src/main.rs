@@ -1,24 +1,32 @@
 use std::{
-    env, fs,
+    env,
+    fmt::Display,
+    fs,
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
-use dialoguer::{theme::ColorfulTheme, Confirm, Password, Select};
+use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect, Password, Select};
+use ilias::{
+    client::IliasClient,
+    exercise::{self, assignment::Assignment},
+    folder::Folder,
+    IliasElement,
+};
 use keyring::Entry;
 use preselect_delete_setting::PreselectDeleteSetting;
-use reqwest::blocking::Client;
-use util::UploadType;
+use reqwest::{blocking::Client, Url};
+use util::{UploadType, ILIAS_URL};
 
 mod arguments;
 mod authentication;
 mod config;
+mod ilias;
 mod preselect_delete_setting;
 mod transform;
 mod uploaders;
 mod util;
-mod ilias;
 
 use crate::{
     arguments::Arguments,
@@ -26,7 +34,7 @@ use crate::{
     config::Config,
     ilias::exercise::Exercise,
     transform::Transformer,
-    uploaders::{file_data::FileData, ilias_folder::IliasFolder, upload_provider::UploadProvider},
+    uploaders::{file_data::FileData, upload_provider::UploadProvider},
 };
 
 fn main() -> Result<()> {
@@ -90,6 +98,8 @@ fn main() -> Result<()> {
 
     println!("Checking ilias {:?} {}", upload_type, ilias_id);
 
+    let ilias_client = IliasClient::new(Url::parse(ILIAS_URL)?)?;
+    ilias_client.authenticate(&username, &password);
     let reqwest_client = Client::builder().cookie_store(true).build().unwrap();
     authenticate(&reqwest_client, &username, &password).unwrap();
 
@@ -98,58 +108,74 @@ fn main() -> Result<()> {
 
     let transformer = Transformer::new(transform_regex, transform_format)?;
 
-    let transformed_file_data = cli_args.file_paths.iter().map(|path| FileData {
-        name: match match &transformer {
-            Some(transformer) => transformer.transform(path),
-            None => None,
-        } {
-            Some(transformed) => transformed,
-            None => Path::new(path)
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned()
-        },
-        path: path.to_string(),
-    });
+    let transformed_file_data = cli_args
+        .file_paths
+        .iter()
+        .map(|path| FileData {
+            name: match match &transformer {
+                Some(transformer) => transformer.transform(path),
+                None => None,
+            } {
+                Some(transformed) => transformed,
+                None => Path::new(path)
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            },
+            path: path.to_string(),
+        })
+        .collect::<Vec<_>>();
 
     match upload_type {
         util::UploadType::EXERCISE => {
-            let course = Exercise::from_id(&reqwest_client, &ilias_id, "unknown").unwrap();
+            let exercise = Exercise::parse(
+                ilias_client
+                    .get_querypath(&Exercise::querypath_from_id(&ilias_id))?
+                    .root_element(),
+                &ilias_client,
+            )?;
 
-            let active_excercises: Vec<_> = course
+            let mut active_assignments = exercise
                 .assignments
-                .iter()
-                .filter(|&excercise| excercise.active)
-                .collect();
-
+                .into_iter()
+                .filter(Assignment::is_active)
+                .collect::<Vec<_>>();
             let selected_index = Select::with_theme(&ColorfulTheme::default())
-                .with_prompt("Excercise to upload to:")
+                .with_prompt("Assignment to upload to:")
                 .default(0)
                 .items(
-                    &active_excercises
+                    &active_assignments
                         .iter()
-                        .map(|excercise| &excercise.name)
+                        .map(|assignment| &assignment.name)
                         .collect::<Vec<_>>(),
                 )
                 .interact()
                 .unwrap();
 
-            let selected_excercise = active_excercises[selected_index];
+            let selected_assignment = &mut active_assignments[selected_index];
+            let selected_submission = selected_assignment
+                .get_submission(&ilias_client)
+                .context("Assignment did not have a submission")?;
             upload_files(
-                &reqwest_client,
-                selected_excercise,
-                transformed_file_data,
+                &ilias_client,
+                selected_submission,
+                &transformed_file_data,
                 upload_type,
                 preselect_delete_setting,
             )
         }
         util::UploadType::FOLDER => {
-            let target = IliasFolder::from_id(&reqwest_client, &ilias_id)?;
+            let folder = Folder::parse(
+                ilias_client
+                    .get_querypath(&Folder::querypath_from_id(&ilias_id))?
+                    .root_element(),
+                &ilias_client,
+            )?;
             upload_files(
-                &reqwest_client,
-                &target,
-                transformed_file_data,
+                &ilias_client,
+                &folder,
+                &transformed_file_data,
                 upload_type,
                 preselect_delete_setting,
             )
@@ -157,19 +183,18 @@ fn main() -> Result<()> {
     }
 }
 
-fn upload_files<T: UploadProvider, I: Iterator<Item = FileData>>(
-    client: &Client,
+fn upload_files<T: UploadProvider>(
+    ilias_client: &IliasClient,
     target: &T,
-    transformed_files: I,
+    transformed_files: &[FileData],
     upload_type: UploadType,
     preselect_delete_setting: PreselectDeleteSetting,
 ) -> Result<()>
 where
-    I: Clone,
+    T::UploadedFile: Display,
 {
-    let conflicting_files =
-        target.get_conflicting_files(&client, transformed_files.clone().map(|data| data.name));
-    if !conflicting_files.is_empty() {
+    let existing_files = target.get_existing_files();
+    if !existing_files.is_empty() {
         let delete = Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt(upload_type.get_delete_message())
             .default(true)
@@ -177,20 +202,29 @@ where
             .unwrap();
 
         if delete {
-            let selection = target.select_files_to_delete(
+            let preselection = target.preselect_files(
                 preselect_delete_setting,
                 &transformed_files,
-                conflicting_files.as_slice(),
+                existing_files,
             );
-            target.delete_files(&client, selection?)?;
+
+            let selection = MultiSelect::with_theme(&ColorfulTheme::default())
+                .with_prompt("Which files do you want to delete")
+                .items_checked(&preselection)
+                .interact()?
+                .into_iter()
+                .map(|i| preselection[i].0)
+                .collect::<Vec<_>>();
+
+            target.delete_files(ilias_client, &selection)?;
         }
     }
 
-    target.upload_files(&client, transformed_files.clone())?;
+    target.upload_files(ilias_client, transformed_files.clone())?;
 
     println!(
         "Uploaded {} successfully!",
-        &transformed_files
+        &transformed_files.iter()
             .map(|item| format!("{} as {}", item.path, item.name))
             .collect::<Vec<String>>()
             .join(", ")

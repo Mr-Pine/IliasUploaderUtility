@@ -9,10 +9,11 @@ pub mod folder;
 pub mod file;
 pub mod client;
 
-trait IliasElement: Sized {
+pub trait IliasElement: Sized {
     fn type_identifier() -> &'static str;
+    fn querypath_from_id(id: &str) -> String;
 
-    fn parse(element: &ElementRef, ilias_client: &IliasClient) -> Result<Self>;
+    fn parse(element: ElementRef, ilias_client: &IliasClient) -> Result<Self>;
 }
 
 fn parse_date(date_string: &str) -> Result<DateTime<Local>> {

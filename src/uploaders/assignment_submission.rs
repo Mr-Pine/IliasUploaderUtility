@@ -3,71 +3,46 @@ use crate::{
     preselect_delete_setting::PreselectDeleteSetting,
 };
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, MultiSelect};
 
 use super::{file_data::FileData, upload_provider::UploadProvider};
 
 impl UploadProvider for AssignmentSubmission {
     type UploadedFile = File;
 
-    fn upload_files<I: IntoIterator<Item = FileData>>(
+    fn upload_files(
         &self,
         ilias_client: &IliasClient,
-        file_data_iter: I,
+        file_data: &[FileData],
     ) -> Result<()> {
-        self.upload_files(ilias_client, file_data_iter)
+        self.upload_files(ilias_client, file_data)
     }
 
-    fn delete_files<I: IntoIterator<Item = Self::UploadedFile>>(
+    fn delete_files(
         self: &Self,
         ilias_client: &IliasClient,
-        files: I,
+        files: &[&Self::UploadedFile],
     ) -> Result<()> {
         self.delete_files(ilias_client, files)
     }
 
-    fn get_conflicting_files<I: IntoIterator<Item = String>>(
+    fn get_existing_files(
         self: &Self,
-        client: &reqwest::blocking::Client,
-        filenames: I,
-    ) -> &[File]
-    where
-        I: Clone,
+    ) -> Vec<&File>
     {
-        &self.submissions
+        self.submissions.iter().collect()
     }
 
-    fn select_files_to_delete<'a, I: Iterator<Item = FileData>>(
-        self: &'a Self,
-        preselect_setting: PreselectDeleteSetting,
-        file_data: &I,
-        conflicting_files: &'a [Self::UploadedFile],
-    ) -> Result<Box<dyn Iterator<Item = File> + '_>>
-    where
-        I: Clone,
-    {
-        let mapped_files: Vec<_> = conflicting_files
-            .iter()
-            .map(|file| {
-                (
-                    file.name.clone(),
-                    match preselect_setting {
-                        PreselectDeleteSetting::ALL => true,
-                        PreselectDeleteSetting::NONE => false,
-                        PreselectDeleteSetting::SMART => file_data
-                            .clone()
-                            .any(|file_data| file_data.name == file.name),
-                    },
-                )
-            })
-            .collect();
-
-        let selection = MultiSelect::with_theme(&ColorfulTheme::default())
-            .with_prompt("Which files do you want to delete")
-            .items_checked(&mapped_files)
-            .interact()?
-            .into_iter()
-            .map(move |index| conflicting_files[index].clone());
-        return Ok(Box::new(selection));
+    fn preselect_files<'a>(&self, preselect_setting: PreselectDeleteSetting, upload_files: &[FileData], existing_files: Vec<&'a Self::UploadedFile>) -> Vec<(&'a Self::UploadedFile, bool)> {
+        existing_files.into_iter().map(|existing_file| {
+            (existing_file,
+             match preselect_setting {
+                 PreselectDeleteSetting::ALL => true,
+                 PreselectDeleteSetting::NONE => false,
+                 PreselectDeleteSetting::SMART => {
+                     let filename = &existing_file.name;
+                     upload_files.iter().any(|file| file.name == *filename)
+                 }
+             }
+        )}).collect()
     }
 }

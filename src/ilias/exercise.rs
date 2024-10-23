@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 
 use anyhow::{Context, Result};
 use assignment::Assignment;
-use scraper::Selector;
+use scraper::{ElementRef, Selector};
 
 pub mod assignment;
 
@@ -25,7 +25,11 @@ impl IliasElement for Exercise {
         "exc"
     }
 
-    fn parse(element: &scraper::ElementRef, ilias_client: &IliasClient) -> Result<Exercise> {
+    fn querypath_from_id(id: &str) -> String {
+        format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
+    }
+
+    fn parse(element: ElementRef, ilias_client: &IliasClient) -> Result<Exercise> {
         let name_selector = NAME_SELECTOR.get_or_init(|| {
             Selector::parse(".il-page-content-header").expect("Could not parse scraper")
         });
@@ -40,7 +44,7 @@ impl IliasElement for Exercise {
         let description = element.select(description_selector).next().context("No \"description\" Element found")?.text().collect();
         let assignments = element
             .select(&assignment_selector)
-            .map(|assignment| Assignment::parse(&assignment, ilias_client).expect("Could not parse assignment"))
+            .map(|assignment| Assignment::parse(assignment, ilias_client).expect("Could not parse assignment"))
             .collect();
 
         Ok(Exercise {
