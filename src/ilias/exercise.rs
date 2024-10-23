@@ -7,9 +7,10 @@ use scraper::{ElementRef, Selector};
 pub mod assignment;
 
 
-use super::{client::IliasClient, IliasElement};
+use super::IliasElement;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Exercise {
     pub name: String,
     pub description: String,
@@ -29,7 +30,7 @@ impl IliasElement for Exercise {
         format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
     }
 
-    fn parse(element: ElementRef, ilias_client: &IliasClient) -> Result<Exercise> {
+    fn parse(element: ElementRef) -> Result<Exercise> {
         let name_selector = NAME_SELECTOR.get_or_init(|| {
             Selector::parse(".il-page-content-header").expect("Could not parse scraper")
         });
@@ -43,8 +44,8 @@ impl IliasElement for Exercise {
         let name = element.select(name_selector).next().context("No \"name\" Element found")?.text().collect();
         let description = element.select(description_selector).next().context("No \"description\" Element found")?.text().collect();
         let assignments = element
-            .select(&assignment_selector)
-            .map(|assignment| Assignment::parse(assignment, ilias_client).expect("Could not parse assignment"))
+            .select(assignment_selector)
+            .map(|assignment| Assignment::parse(assignment).expect("Could not parse assignment"))
             .collect();
 
         Ok(Exercise {

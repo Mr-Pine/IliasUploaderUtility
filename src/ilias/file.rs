@@ -3,6 +3,7 @@ use std::fmt::Display;
 use chrono::{DateTime, Local};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct File {
     pub name: String,
     pub description: String,

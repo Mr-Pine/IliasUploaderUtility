@@ -70,7 +70,7 @@ impl IliasClient {
         ];
 
         let mut url = self.base_url.clone();
-        url.set_path(&shib_path);
+        url.set_path(shib_path);
         let shib_url = url.as_str().to_owned();
 
         let shib_login_page = self.client.post(url).form(&shib_params).send()?;

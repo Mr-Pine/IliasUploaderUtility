@@ -2,7 +2,7 @@ use std::{
     env,
     fmt::Display,
     fs,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -10,17 +10,16 @@ use clap::Parser;
 use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect, Password, Select};
 use ilias::{
     client::IliasClient,
-    exercise::{self, assignment::Assignment},
+    exercise::assignment::Assignment,
     folder::Folder,
     IliasElement,
 };
 use keyring::Entry;
 use preselect_delete_setting::PreselectDeleteSetting;
-use reqwest::{blocking::Client, Url};
+use reqwest::Url;
 use util::{UploadType, ILIAS_URL};
 
 mod arguments;
-mod authentication;
 mod config;
 mod ilias;
 mod preselect_delete_setting;
@@ -30,7 +29,6 @@ mod util;
 
 use crate::{
     arguments::Arguments,
-    authentication::authenticate,
     config::Config,
     ilias::exercise::Exercise,
     transform::Transformer,
@@ -84,7 +82,7 @@ fn main() -> Result<()> {
         Some(setting) => setting,
         None => match file_config.preselect_delete {
             Some(setting) => setting,
-            None => preselect_delete_setting::PreselectDeleteSetting::SMART,
+            None => preselect_delete_setting::PreselectDeleteSetting::Smart,
         },
     };
 
@@ -92,16 +90,14 @@ fn main() -> Result<()> {
         Some(upload_type) => upload_type,
         None => match file_config.upload_type {
             Some(upload_type) => upload_type,
-            None => util::UploadType::EXERCISE,
+            None => util::UploadType::Exercise,
         },
     };
 
     println!("Checking ilias {:?} {}", upload_type, ilias_id);
 
     let ilias_client = IliasClient::new(Url::parse(ILIAS_URL)?)?;
-    ilias_client.authenticate(&username, &password);
-    let reqwest_client = Client::builder().cookie_store(true).build().unwrap();
-    authenticate(&reqwest_client, &username, &password).unwrap();
+    let _ = ilias_client.authenticate(&username, &password);
 
     let transform_regex = file_config.transform_regex;
     let transform_format = file_config.transform_format;
@@ -128,12 +124,11 @@ fn main() -> Result<()> {
         .collect::<Vec<_>>();
 
     match upload_type {
-        util::UploadType::EXERCISE => {
+        util::UploadType::Exercise => {
             let exercise = Exercise::parse(
                 ilias_client
                     .get_querypath(&Exercise::querypath_from_id(&ilias_id))?
-                    .root_element(),
-                &ilias_client,
+                    .root_element()
             )?;
 
             let mut active_assignments = exercise
@@ -165,12 +160,11 @@ fn main() -> Result<()> {
                 preselect_delete_setting,
             )
         }
-        util::UploadType::FOLDER => {
+        util::UploadType::Folder => {
             let folder = Folder::parse(
                 ilias_client
                     .get_querypath(&Folder::querypath_from_id(&ilias_id))?
-                    .root_element(),
-                &ilias_client,
+                    .root_element()
             )?;
             upload_files(
                 &ilias_client,
@@ -204,7 +198,7 @@ where
         if delete {
             let preselection = target.preselect_files(
                 preselect_delete_setting,
-                &transformed_files,
+                transformed_files,
                 existing_files,
             );
 
@@ -220,7 +214,7 @@ where
         }
     }
 
-    target.upload_files(ilias_client, transformed_files.clone())?;
+    target.upload_files(ilias_client, transformed_files)?;
 
     println!(
         "Uploaded {} successfully!",
@@ -256,14 +250,13 @@ fn search_config(depth: &i16) -> Result<String> {
     Err(anyhow!("Could not find config file"))
 }
 
-fn contains_config_file(path: &PathBuf) -> Result<bool> {
+fn contains_config_file(path: &Path) -> Result<bool> {
     let found = path
         .read_dir()?
-        .into_iter()
         .map(|file_res| match file_res {
             Ok(file) => file.file_name(),
             Err(_) => "".into(),
         })
         .any(|file_name| file_name == CONFIG_FILE_NAME);
-    return Ok(found);
+    Ok(found)
 }

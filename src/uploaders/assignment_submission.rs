@@ -18,7 +18,7 @@ impl UploadProvider for AssignmentSubmission {
     }
 
     fn delete_files(
-        self: &Self,
+        &self,
         ilias_client: &IliasClient,
         files: &[&Self::UploadedFile],
     ) -> Result<()> {
@@ -26,7 +26,7 @@ impl UploadProvider for AssignmentSubmission {
     }
 
     fn get_existing_files(
-        self: &Self,
+        &self,
     ) -> Vec<&File>
     {
         self.submissions.iter().collect()
@@ -36,9 +36,9 @@ impl UploadProvider for AssignmentSubmission {
         existing_files.into_iter().map(|existing_file| {
             (existing_file,
              match preselect_setting {
-                 PreselectDeleteSetting::ALL => true,
-                 PreselectDeleteSetting::NONE => false,
-                 PreselectDeleteSetting::SMART => {
+                 PreselectDeleteSetting::All => true,
+                 PreselectDeleteSetting::None => false,
+                 PreselectDeleteSetting::Smart => {
                      let filename = &existing_file.name;
                      upload_files.iter().any(|file| file.name == *filename)
                  }

@@ -20,7 +20,7 @@ macro_rules! ilias_url {
 
 pub trait Querypath {
     fn get_querypath(&self) -> String;
-    fn set_querypath(self: &mut Self, querypath: &str);
+    fn set_querypath(&mut self, querypath: &str);
 }
 
 impl Querypath for Url {
@@ -28,7 +28,7 @@ impl Querypath for Url {
         format!("{}?{}", self.path(), self.query().unwrap_or(""))
     }
 
-    fn set_querypath(self: &mut Self, querypath: &str) {
+    fn set_querypath(&mut self, querypath: &str) {
         let mut parts = querypath.split("?");
         self.set_path(parts.next().unwrap());
         self.set_query(parts.next());
@@ -38,21 +38,14 @@ impl Querypath for Url {
 #[derive(Debug, Deserialize, Clone, ValueEnum, PartialEq)]
 #[clap(rename_all = "kebab_case")]
 pub enum UploadType {
-    EXERCISE, FOLDER
+    Exercise, Folder
 }
 
 impl UploadType {
-    pub fn ilias_target_identifier(self: &Self) -> &str{
+    pub fn get_delete_message(&self) -> &str{
         match self {
-            UploadType::EXERCISE => "exc",
-            UploadType::FOLDER => "fold",
-        }
-    }
-
-    pub fn get_delete_message(self: &Self) -> &str{
-        match self {
-            UploadType::EXERCISE => "This excercise already has uploaded files. Do you want to delete any of them?",
-            UploadType::FOLDER => "There are already files in this folder. Do you want to delete any of them?",
+            UploadType::Exercise => "This excercise already has uploaded files. Do you want to delete any of them?",
+            UploadType::Folder => "There are already files in this folder. Do you want to delete any of them?",
         }
     }
 }

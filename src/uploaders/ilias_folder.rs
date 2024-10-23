@@ -17,7 +17,7 @@ impl UploadProvider for Folder {
     }
 
     fn delete_files(
-        self: &Self,
+        &self,
         ilias_client: &IliasClient,
         files: &[&Self::UploadedFile],
     ) -> Result<()> {
@@ -27,17 +27,11 @@ impl UploadProvider for Folder {
         Ok(())
     }
 
-    fn get_existing_files(self: &Self) -> Vec<&FolderElement> {
+    fn get_existing_files(&self) -> Vec<&FolderElement> {
         let files = self
             .elements
             .iter()
-            .filter_map(|element| match element {
-                FolderElement::File {
-                    file: _,
-                    deletion_querypath: _,
-                } => Some(element),
-                _ => None,
-            })
+            .filter(|element| matches!(element, FolderElement::File { file: _, deletion_querypath: _ }))
             .collect::<Vec<_>>();
         files
     }
@@ -54,9 +48,9 @@ impl UploadProvider for Folder {
                 (
                     existing_file,
                     match preselect_setting {
-                        PreselectDeleteSetting::ALL => true,
-                        PreselectDeleteSetting::NONE => false,
-                        PreselectDeleteSetting::SMART => {
+                        PreselectDeleteSetting::All => true,
+                        PreselectDeleteSetting::None => false,
+                        PreselectDeleteSetting::Smart => {
                             let filename = &existing_file
                                 .file()
                                 .expect("Encountered non-file existing element")

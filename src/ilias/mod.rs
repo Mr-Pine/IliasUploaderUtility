@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Days, Local, NaiveTime, TimeZone};
-use client::IliasClient;
 use regex::Regex;
 use scraper::ElementRef;
 
@@ -13,7 +12,7 @@ pub trait IliasElement: Sized {
     fn type_identifier() -> &'static str;
     fn querypath_from_id(id: &str) -> String;
 
-    fn parse(element: ElementRef, ilias_client: &IliasClient) -> Result<Self>;
+    fn parse(element: ElementRef) -> Result<Self>;
 }
 
 fn parse_date(date_string: &str) -> Result<DateTime<Local>> {

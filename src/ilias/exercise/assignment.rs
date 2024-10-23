@@ -6,7 +6,7 @@ use reqwest::blocking::multipart::Form;
 use scraper::{selectable::Selectable, ElementRef, Selector};
 
 use crate::{
-    ilias::{client::IliasClient, file::File, parse_date, IliasElement}, uploaders::{file_data::FileData, file_with_filename::AddFileWithFilename}, util::Querypath
+    ilias::{client::IliasClient, file::File, parse_date, IliasElement}, uploaders::{file_data::FileData, file_with_filename::AddFileWithFilename}
 };
 
 #[derive(Debug)]
@@ -16,6 +16,7 @@ pub enum Submission {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Assignment {
     pub name: String,
     pub instructions: String,
@@ -41,7 +42,7 @@ impl IliasElement for Assignment {
         format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
     }
 
-    fn parse(element: ElementRef, ilias_client: &IliasClient) -> Result<Self> {
+    fn parse(element: ElementRef) -> Result<Self> {
         let name_selector = NAME_SELECTOR.get_or_init(|| {
             Selector::parse(".ilAssignmentHeader").expect("Could not parse selector")
         });
@@ -175,7 +176,7 @@ impl IliasElement for Assignment {
             submission_date,
             attachments,
             submission: submission_page_querypath
-                .map(|querypath| Submission::Unresolved(querypath)),
+                .map(Submission::Unresolved),
         })
     }
 }
@@ -186,9 +187,7 @@ impl Assignment {
     }
 
     pub fn get_submission(&mut self, ilias_client: &IliasClient) -> Option<&AssignmentSubmission> {
-        match self.submission.as_mut() {
-            None => None,
-            Some(submission) => Some({
+        self.submission.as_mut().map(|submission| {
                 match submission {
                     Submission::Parsed(ass_sub) => ass_sub,
                     Submission::Unresolved(querypath) => {
@@ -201,16 +200,14 @@ impl Assignment {
                         )
                         .expect("Could not parse submission page");
                         *submission = Submission::Parsed(ass_sub);
-                        let ass_sub = match submission {
+
+                        match submission {
                             Submission::Parsed(ref x) => x,
                             _ => unreachable!(),
-                        };
-
-                        ass_sub
+                        }
                     }
                 }
-            }),
-        }
+            })
     }
 }
 
@@ -222,8 +219,7 @@ pub struct AssignmentSubmission {
 }
 
 static UPLOAD_BUTTON_SELECTOR: OnceLock<Selector> = OnceLock::new();
-static UPLOAD_FORM_SELECTOR: OnceLock<Selector> = OnceLock::new();
-static DELETE_FORM_SELECTOR: OnceLock<Selector> = OnceLock::new();
+static CONTENT_FORM_SELECTOR: OnceLock<Selector> = OnceLock::new();
 static FILE_ROW_SELECTOR: OnceLock<Selector> = OnceLock::new();
 
 impl AssignmentSubmission {
@@ -234,10 +230,7 @@ impl AssignmentSubmission {
         let upload_button_selector = UPLOAD_BUTTON_SELECTOR.get_or_init(|| {
             Selector::parse(r#"nav div.navbar-header button"#).expect("Could not parse selector")
         });
-        let upload_form_selector = UPLOAD_FORM_SELECTOR.get_or_init(|| {
-            Selector::parse(r#"div#ilContentContainer form"#).expect("Could not parse selector")
-        });
-        let delete_form_selector = UPLOAD_BUTTON_SELECTOR.get_or_init(|| {
+        let content_form_selector = CONTENT_FORM_SELECTOR.get_or_init(|| {
             Selector::parse(r#"div#ilContentContainer form"#).expect("Could not parse selector")
         });
         let file_row_selector = FILE_ROW_SELECTOR
@@ -289,7 +282,7 @@ impl AssignmentSubmission {
             .collect();
 
         let delete_querypath = submission_page
-            .select(delete_form_selector)
+            .select(content_form_selector)
             .next()
             .context("Did not find deltion form")?
             .value()
@@ -305,7 +298,7 @@ impl AssignmentSubmission {
             .context("Did not find data-action on upload button")?;
         let upload_page = ilias_client.get_querypath(upload_form_querypath)?;
         let upload_querypath = upload_page
-            .select(upload_form_selector)
+            .select(content_form_selector)
             .next()
             .context("Did not find upload form")?
             .value()
@@ -321,7 +314,7 @@ impl AssignmentSubmission {
     }
 
     pub fn delete_files(&self, ilias_client: &IliasClient, files: &[&File]) -> Result<()> {
-        let mut form_args = files.into_iter().map(|&file| file.id.clone().expect("Files to delete must have an id")).map(|id| ("delivered[]", id)).collect::<Vec<_>>();
+        let mut form_args = files.iter().map(|&file| file.id.clone().expect("Files to delete must have an id")).map(|id| ("delivered[]", id)).collect::<Vec<_>>();
         form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));
 
         ilias_client.post_querypath_form(&self.delete_querypath, &form_args)

@@ -11,6 +11,7 @@ use crate::{uploaders::file_data::FileData, util::Querypath};
 use super::{client::IliasClient, file::File, parse_date, IliasElement};
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum FolderElement {
     File {
         file: File,
@@ -40,6 +41,7 @@ pub enum FolderElement {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct Folder {
     name: String,
     description: String,
@@ -71,7 +73,7 @@ impl IliasElement for Folder {
         format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
     }
 
-    fn parse(element: ElementRef, ilias_client: &super::client::IliasClient) -> Result<Self> {
+    fn parse(element: ElementRef) -> Result<Self> {
         let name_selector = NAME_SELECTOR.get_or_init(|| {
             Selector::parse(".il-page-content-header").expect("Could not parse selector")
         });
@@ -113,7 +115,7 @@ impl IliasElement for Folder {
             .filter_map(|element| FolderElement::parse(element))
             .collect();
 
-        let upload_page_querypath = element.select(upload_file_page_selector).next().and_then(|link| link.attr("href")).map(&str::to_string);
+        let upload_page_querypath = element.select(upload_file_page_selector).next().and_then(|link| link.attr("href")).map(str::to_string);
 
         Ok(Folder {
             name,
@@ -137,7 +139,7 @@ impl Folder {
             .expect("Could not parse scraper"));
 
         let finish_upload_querypath = upload_page
-            .select(&upload_form_selector)
+            .select(upload_form_selector)
             .next()
             .unwrap()
             .value()
@@ -145,7 +147,7 @@ impl Folder {
             .unwrap();
 
         let relevant_script_tag = upload_page
-            .select(&script_tag_selector)
+            .select(script_tag_selector)
             .next()
             .unwrap()
             .text()
@@ -204,7 +206,7 @@ impl FolderElement {
         let querypath = Url::parse(link)
             .expect("Could not parse link")
             .get_querypath();
-        let deletion_querypath = actions.filter_map(|action| action.attr("href")).find(|&action| action.contains("cmd=delete")).map(&str::to_string);
+        let deletion_querypath = actions.filter_map(|action| action.attr("href")).find(|&action| action.contains("cmd=delete")).map(str::to_string);
 
         Self::extract_from_querypath(querypath, name, description, deletion_querypath, &mut properties)
     }
@@ -321,14 +323,14 @@ impl FolderElement {
         let form_selector = MAIN_FORM_SELECTOR.get_or_init(|| Selector::parse("main form")
             .expect("Could not parse scraper"));
         let confirm_querypath = delete_page
-            .select(&form_selector)
+            .select(form_selector)
             .next().context("Could not find confirmation form")?
             .value()
             .attr("action").context("Could not find action on form")?;
 
         let form_data = [("id[]", self.id()),("cmd[confirmedDelete]", "I fucking hate ILIAS")];
 
-        ilias_client.post_querypath_form(confirm_querypath, &form_data);
+        let _ = ilias_client.post_querypath_form(confirm_querypath, &form_data);
         Ok(())
     }
 }
