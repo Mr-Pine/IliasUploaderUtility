@@ -6,10 +6,11 @@ use reqwest::{blocking::multipart::Form, Url};
 use scraper::{element_ref::Select, selectable::Selectable, ElementRef, Selector};
 use serde::{Deserialize, Serialize};
 
-use crate::{uploaders::{file_data::FileData, file_with_filename::AddFileWithFilename}, util::Querypath};
+use crate::{uploaders::file_data::FileData, util::Querypath};
 
 use super::{client::IliasClient, file::File, parse_date, IliasElement};
 
+#[derive(Clone)]
 pub enum FolderElement {
     File {
         file: File,
@@ -38,11 +39,12 @@ pub enum FolderElement {
     },
 }
 
+#[derive(Clone)]
 pub struct Folder {
     name: String,
     description: String,
     id: String,
-    elements: Vec<FolderElement>,
+    pub elements: Vec<FolderElement>,
     upload_page_querypath: Option<String>
 }
 
@@ -119,13 +121,13 @@ impl IliasElement for Folder {
     }
 }
 
-static UPLOAD_FORM_SELECTOR: OnceLock<Selector> = OnceLock::new();
+static MAIN_FORM_SELECTOR: OnceLock<Selector> = OnceLock::new();
 static SCRIPT_TAG_SELECTOR: OnceLock<Selector> = OnceLock::new();
 
 impl Folder {
     pub fn upload_files<I: IntoIterator<Item = FileData>>(&self, ilias_client: &IliasClient, files: I) -> Result<()> {
         let upload_page = ilias_client.get_querypath(&self.upload_page_querypath.clone().context("No upload available for this folder")?)?;
-        let upload_form_selector = UPLOAD_FORM_SELECTOR.get_or_init(|| Selector::parse("main form")
+        let upload_form_selector = MAIN_FORM_SELECTOR.get_or_init(|| Selector::parse("main form")
             .expect("Could not parse scraper"));
         let script_tag_selector = SCRIPT_TAG_SELECTOR.get_or_init(|| Selector::parse("body script:not([src])")
             .expect("Could not parse scraper"));
@@ -281,5 +283,48 @@ impl FolderElement {
         } else {
             None
         }
+    }
+
+    fn deletion_querypath(&self) -> Option<&String> {
+        match self {
+            Self::File { file: _, deletion_querypath } => deletion_querypath,
+            Self::Exercise { name: _, description: _, id: _, querypath: _, deletion_querypath } => deletion_querypath,
+            Self::Opencast { name: _, description: _, id: _, querypath: _, deletion_querypath } => deletion_querypath,
+            Self::Viewable { name: _, description: _, id: _, querypath: _, deletion_querypath } => deletion_querypath
+        }.as_ref()
+    }
+
+    pub fn file(&self) -> Option<&File> {
+        match self {
+            Self::File { file, deletion_querypath: _} => Some(file),
+            _ => None
+        }
+    }
+
+    fn id(&self) -> &str {
+        match self {
+            Self::File { file, deletion_querypath: _ } => file.id.as_ref().unwrap(),
+            Self::Exercise { name: _, description: _, id, querypath: _, deletion_querypath: _ } => id,
+            Self::Opencast { name: _, description: _, id, querypath: _, deletion_querypath: _ } => id,
+            Self::Viewable { name: _, description: _, id, querypath: _, deletion_querypath: _ } => id
+        }
+    }
+
+    pub fn delete(&self, ilias_client: &IliasClient) -> Result<()> {
+        let deletion_querypath = self.deletion_querypath();
+        let delete_page = ilias_client.get_querypath(deletion_querypath.context("You can not delete this element")?)?;
+
+        let form_selector = MAIN_FORM_SELECTOR.get_or_init(|| Selector::parse("main form")
+            .expect("Could not parse scraper"));
+        let confirm_querypath = delete_page
+            .select(&form_selector)
+            .next().context("Could not find confirmation form")?
+            .value()
+            .attr("action").context("Could not find action on form")?;
+
+        let form_data = [("id[]", self.id()),("cmd[confirmedDelete]", "I fucking hate ILIAS")];
+
+        ilias_client.post_querypath_form(confirm_querypath, &form_data);
+        Ok(())
     }
 }
