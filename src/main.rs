@@ -14,16 +14,17 @@ use util::UploadType;
 mod arguments;
 mod authentication;
 mod config;
-mod course;
 mod preselect_delete_setting;
 mod transform;
 mod uploaders;
 mod util;
+mod ilias;
+
 use crate::{
     arguments::Arguments,
     authentication::authenticate,
     config::Config,
-    course::Course,
+    ilias::exercise::Exercise,
     transform::Transformer,
     uploaders::{file_data::FileData, ilias_folder::IliasFolder, upload_provider::UploadProvider},
 };
@@ -114,10 +115,10 @@ fn main() -> Result<()> {
 
     match upload_type {
         util::UploadType::EXERCISE => {
-            let course = Course::from_id(&reqwest_client, &ilias_id, "unknown").unwrap();
+            let course = Exercise::from_id(&reqwest_client, &ilias_id, "unknown").unwrap();
 
             let active_excercises: Vec<_> = course
-                .excercises
+                .assignments
                 .iter()
                 .filter(|&excercise| excercise.active)
                 .collect();

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ilias_url,
     uploaders::existing_file::ExistingFile,
-    util::{SetQuerypath, UploadType},
+    util::{Querypath, UploadType},
 };
 
 use super::upload_provider::UploadProvider;

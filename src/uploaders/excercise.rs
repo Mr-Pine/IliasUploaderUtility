@@ -10,7 +10,7 @@ use scraper::{ElementRef, Html, Selector};
 
 use crate::{
     preselect_delete_setting::PreselectDeleteSetting,
-    uploaders::file_with_filename::AddFileWithFilename, util::SetQuerypath,
+    uploaders::file_with_filename::AddFileWithFilename, util::Querypath,
 };
 
 use super::{file_data::FileData, upload_provider::UploadProvider, existing_file::ExistingFile};

@@ -18,16 +18,21 @@ macro_rules! ilias_url {
     };
 }
 
-pub trait SetQuerypath {
+pub trait Querypath {
+    fn get_querypath(&self) -> String;
     fn set_querypath(self: &mut Self, querypath: &str);
 }
 
-impl SetQuerypath for Url {
+impl Querypath for Url {
+    fn get_querypath(&self) -> String {
+        format!("{}?{}", self.path(), self.query().unwrap_or(""))
+    }
+
     fn set_querypath(self: &mut Self, querypath: &str) {
         let mut parts = querypath.split("?");
         self.set_path(parts.next().unwrap());
         self.set_query(parts.next());
-    }   
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, ValueEnum, PartialEq)]
