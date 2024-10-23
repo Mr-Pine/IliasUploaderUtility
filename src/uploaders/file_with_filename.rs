@@ -16,7 +16,7 @@ impl AddFileWithFilename for Form {
     where
         T: Into<Cow<'static, str>>,
         U: AsRef<Path>,
-        V: Into<Cow<'static, str>>
+        V: Into<Cow<'static, str>>,
     {
         Ok(self.part(name, Part::file(path)?.file_name(filename)))
     }

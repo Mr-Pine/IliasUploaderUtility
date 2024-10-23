@@ -24,6 +24,6 @@ The following config options are available
 
 - `username`: Your shibboleth username (uxxxx)
 - `ilias_id`: The id of the Ilias object you want to upload to <details><summary>Finding the id</summary>![ilias_id example](./Media/ilias_id.png)<br></details>
-- `preselect_delete` - `ALL|SMART|NONE`: When overwriting files select what files should be preselected to be deleted, `SMART` selects files with the same name
+- `preselect_delete` - `All|Smart|None`: When overwriting files select what files should be preselected to be deleted, `SMART` selects files with the same name
 - `transform_regex`, `transform_format`: Regex transforms to run on each filename before uploading. Uses the syntax from [`Regex::replace_all` from the `regex` crate](https://docs.rs/regex/latest/regex/struct.Regex.html#method.replace_all)
-- `upload_type` - `EXERCISE|FOLDER`: What kind of target you want to upload to. Chose `EXERCISE` for submitting solutions and `FOLDER` for uploading slides and other material to a course
+- `upload_type` - `Exercise|Folder`: What kind of target you want to upload to. Chose `EXERCISE` for submitting solutions and `FOLDER` for uploading slides and other material to a course

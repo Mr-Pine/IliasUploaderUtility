@@ -31,7 +31,15 @@ impl UploadProvider for Folder {
         let files = self
             .elements
             .iter()
-            .filter(|element| matches!(element, FolderElement::File { file: _, deletion_querypath: _ }))
+            .filter(|element| {
+                matches!(
+                    element,
+                    FolderElement::File {
+                        file: _,
+                        deletion_querypath: _
+                    }
+                )
+            })
             .collect::<Vec<_>>();
         files
     }

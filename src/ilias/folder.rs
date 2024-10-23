@@ -47,14 +47,14 @@ pub struct Folder {
     description: String,
     id: String,
     pub elements: Vec<FolderElement>,
-    upload_page_querypath: Option<String>
+    upload_page_querypath: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IliasUploadResponse {
     status: u8,
     message: String,
-    file_id: String
+    file_id: String,
 }
 
 static NAME_SELECTOR: OnceLock<Selector> = OnceLock::new();
@@ -70,7 +70,11 @@ impl IliasElement for Folder {
     }
 
     fn querypath_from_id(id: &str) -> String {
-        format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
+        format!(
+            "goto.php?target={}_{}&client_id=produktiv",
+            Self::type_identifier(),
+            id
+        )
     }
 
     fn parse(element: ElementRef) -> Result<Self> {
@@ -115,14 +119,18 @@ impl IliasElement for Folder {
             .filter_map(|element| FolderElement::parse(element))
             .collect();
 
-        let upload_page_querypath = element.select(upload_file_page_selector).next().and_then(|link| link.attr("href")).map(str::to_string);
+        let upload_page_querypath = element
+            .select(upload_file_page_selector)
+            .next()
+            .and_then(|link| link.attr("href"))
+            .map(str::to_string);
 
         Ok(Folder {
             name,
             description,
             id,
             elements,
-            upload_page_querypath
+            upload_page_querypath,
         })
     }
 }
@@ -132,11 +140,17 @@ static SCRIPT_TAG_SELECTOR: OnceLock<Selector> = OnceLock::new();
 
 impl Folder {
     pub fn upload_files(&self, ilias_client: &IliasClient, files: &[FileData]) -> Result<()> {
-        let upload_page = ilias_client.get_querypath(&self.upload_page_querypath.clone().context("No upload available for this folder")?)?;
-        let upload_form_selector = MAIN_FORM_SELECTOR.get_or_init(|| Selector::parse("main form")
-            .expect("Could not parse scraper"));
-        let script_tag_selector = SCRIPT_TAG_SELECTOR.get_or_init(|| Selector::parse("body script:not([src])")
-            .expect("Could not parse scraper"));
+        let upload_page = ilias_client.get_querypath(
+            &self
+                .upload_page_querypath
+                .clone()
+                .context("No upload available for this folder")?,
+        )?;
+        let upload_form_selector = MAIN_FORM_SELECTOR
+            .get_or_init(|| Selector::parse("main form").expect("Could not parse scraper"));
+        let script_tag_selector = SCRIPT_TAG_SELECTOR.get_or_init(|| {
+            Selector::parse("body script:not([src])").expect("Could not parse scraper")
+        });
 
         let finish_upload_querypath = upload_page
             .select(upload_form_selector)
@@ -153,14 +167,19 @@ impl Folder {
             .text()
             .collect::<String>();
 
-        let path_regex = Regex::new(r".*il\.UI\.Input\.File\.init\([^']*'[^']*',[^']*'(?<querypath>[^']+)'.*").expect("cursed regex lol");
-        let upload_querypath = &path_regex.captures(&relevant_script_tag).expect("no match found :()")["querypath"];
+        let path_regex =
+            Regex::new(r".*il\.UI\.Input\.File\.init\([^']*'[^']*',[^']*'(?<querypath>[^']+)'.*")
+                .expect("cursed regex lol");
+        let upload_querypath = &path_regex
+            .captures(&relevant_script_tag)
+            .expect("no match found :()")["querypath"];
 
         for file_data in files {
-            let form = Form::new()
-                .file("file[0]", file_data.path.clone())?;
+            let form = Form::new().file("file[0]", file_data.path.clone())?;
 
-            let response: IliasUploadResponse = ilias_client.post_querypath_multipart(upload_querypath, form)?.json()?;
+            let response: IliasUploadResponse = ilias_client
+                .post_querypath_multipart(upload_querypath, form)?
+                .json()?;
             let file_id = response.file_id;
 
             let finish_form = Form::new()
@@ -189,8 +208,9 @@ impl FolderElement {
         });
         let element_description_selector = ELEMENT_DESCRIPTION_SELECTOR
             .get_or_init(|| Selector::parse(".il_Description").expect("Could not parse selector"));
-        let element_actions_selector = ELEMENT_ACTIONS_SELECTOR
-            .get_or_init(|| Selector::parse(".dropdown-menu li>a").expect("Could not parse selector"));
+        let element_actions_selector = ELEMENT_ACTIONS_SELECTOR.get_or_init(|| {
+            Selector::parse(".dropdown-menu li>a").expect("Could not parse selector")
+        });
         let element_properties_selector = ELEMENT_PROPERTIES_SELECTOR.get_or_init(|| {
             Selector::parse(".il_ItemProperties").expect("Could not parse selector")
         });
@@ -206,9 +226,18 @@ impl FolderElement {
         let querypath = Url::parse(link)
             .expect("Could not parse link")
             .get_querypath();
-        let deletion_querypath = actions.filter_map(|action| action.attr("href")).find(|&action| action.contains("cmd=delete")).map(str::to_string);
+        let deletion_querypath = actions
+            .filter_map(|action| action.attr("href"))
+            .find(|&action| action.contains("cmd=delete"))
+            .map(str::to_string);
 
-        Self::extract_from_querypath(querypath, name, description, deletion_querypath, &mut properties)
+        Self::extract_from_querypath(
+            querypath,
+            name,
+            description,
+            deletion_querypath,
+            &mut properties,
+        )
     }
 
     fn extract_from_querypath(
@@ -293,42 +322,94 @@ impl FolderElement {
 
     fn deletion_querypath(&self) -> Option<&String> {
         match self {
-            Self::File { file: _, deletion_querypath } => deletion_querypath,
-            Self::Exercise { name: _, description: _, id: _, querypath: _, deletion_querypath } => deletion_querypath,
-            Self::Opencast { name: _, description: _, id: _, querypath: _, deletion_querypath } => deletion_querypath,
-            Self::Viewable { name: _, description: _, id: _, querypath: _, deletion_querypath } => deletion_querypath
-        }.as_ref()
+            Self::File {
+                file: _,
+                deletion_querypath,
+            } => deletion_querypath,
+            Self::Exercise {
+                name: _,
+                description: _,
+                id: _,
+                querypath: _,
+                deletion_querypath,
+            } => deletion_querypath,
+            Self::Opencast {
+                name: _,
+                description: _,
+                id: _,
+                querypath: _,
+                deletion_querypath,
+            } => deletion_querypath,
+            Self::Viewable {
+                name: _,
+                description: _,
+                id: _,
+                querypath: _,
+                deletion_querypath,
+            } => deletion_querypath,
+        }
+        .as_ref()
     }
 
     pub fn file(&self) -> Option<&File> {
         match self {
-            Self::File { file, deletion_querypath: _} => Some(file),
-            _ => None
+            Self::File {
+                file,
+                deletion_querypath: _,
+            } => Some(file),
+            _ => None,
         }
     }
 
     fn id(&self) -> &str {
         match self {
-            Self::File { file, deletion_querypath: _ } => file.id.as_ref().unwrap(),
-            Self::Exercise { name: _, description: _, id, querypath: _, deletion_querypath: _ } => id,
-            Self::Opencast { name: _, description: _, id, querypath: _, deletion_querypath: _ } => id,
-            Self::Viewable { name: _, description: _, id, querypath: _, deletion_querypath: _ } => id
+            Self::File {
+                file,
+                deletion_querypath: _,
+            } => file.id.as_ref().unwrap(),
+            Self::Exercise {
+                name: _,
+                description: _,
+                id,
+                querypath: _,
+                deletion_querypath: _,
+            } => id,
+            Self::Opencast {
+                name: _,
+                description: _,
+                id,
+                querypath: _,
+                deletion_querypath: _,
+            } => id,
+            Self::Viewable {
+                name: _,
+                description: _,
+                id,
+                querypath: _,
+                deletion_querypath: _,
+            } => id,
         }
     }
 
     pub fn delete(&self, ilias_client: &IliasClient) -> Result<()> {
         let deletion_querypath = self.deletion_querypath();
-        let delete_page = ilias_client.get_querypath(deletion_querypath.context("You can not delete this element")?)?;
+        let delete_page = ilias_client
+            .get_querypath(deletion_querypath.context("You can not delete this element")?)?;
 
-        let form_selector = MAIN_FORM_SELECTOR.get_or_init(|| Selector::parse("main form")
-            .expect("Could not parse scraper"));
+        let form_selector = MAIN_FORM_SELECTOR
+            .get_or_init(|| Selector::parse("main form").expect("Could not parse scraper"));
         let confirm_querypath = delete_page
             .select(form_selector)
-            .next().context("Could not find confirmation form")?
+            .next()
+            .context("Could not find confirmation form")?
             .value()
-            .attr("action").context("Could not find action on form")?;
+            .attr("action")
+            .context("Could not find action on form")?;
 
-        let form_data = [("id[]", self.id()),("cmd[confirmedDelete]", "I fucking hate ILIAS")];
+        let form_data = [
+            ("id[]", self.id()),
+            ("cmd[confirmedDelete]", "I fucking hate ILIAS"),
+        ];
 
         let _ = ilias_client.post_querypath_form(confirm_querypath, &form_data);
         Ok(())
@@ -338,10 +419,31 @@ impl FolderElement {
 impl Display for FolderElement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FolderElement::File { file, deletion_querypath: _ } => write!(f, "{}", file),
-            FolderElement::Exercise { name, description: _, id: _, querypath: _, deletion_querypath: _ } => write!(f, "Exercise {}", name),
-            FolderElement::Opencast { name, description: _, id: _, querypath: _, deletion_querypath: _ } => write!(f, "OpenCast {}", name),
-            FolderElement::Viewable { name, description: _, id: _, querypath: _, deletion_querypath: _ } => write!(f, "Folder(-like) {}", name)
+            FolderElement::File {
+                file,
+                deletion_querypath: _,
+            } => write!(f, "{}", file),
+            FolderElement::Exercise {
+                name,
+                description: _,
+                id: _,
+                querypath: _,
+                deletion_querypath: _,
+            } => write!(f, "Exercise {}", name),
+            FolderElement::Opencast {
+                name,
+                description: _,
+                id: _,
+                querypath: _,
+                deletion_querypath: _,
+            } => write!(f, "OpenCast {}", name),
+            FolderElement::Viewable {
+                name,
+                description: _,
+                id: _,
+                querypath: _,
+                deletion_querypath: _,
+            } => write!(f, "Folder(-like) {}", name),
         }
     }
 }

@@ -6,7 +6,6 @@ use scraper::{ElementRef, Selector};
 
 pub mod assignment;
 
-
 use super::IliasElement;
 
 #[derive(Debug)]
@@ -27,7 +26,11 @@ impl IliasElement for Exercise {
     }
 
     fn querypath_from_id(id: &str) -> String {
-        format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
+        format!(
+            "goto.php?target={}_{}&client_id=produktiv",
+            Self::type_identifier(),
+            id
+        )
     }
 
     fn parse(element: ElementRef) -> Result<Exercise> {
@@ -41,8 +44,18 @@ impl IliasElement for Exercise {
                 .expect("Could not parse scraper")
         });
 
-        let name = element.select(name_selector).next().context("No \"name\" Element found")?.text().collect();
-        let description = element.select(description_selector).next().context("No \"description\" Element found")?.text().collect();
+        let name = element
+            .select(name_selector)
+            .next()
+            .context("No \"name\" Element found")?
+            .text()
+            .collect();
+        let description = element
+            .select(description_selector)
+            .next()
+            .context("No \"description\" Element found")?
+            .text()
+            .collect();
         let assignments = element
             .select(assignment_selector)
             .map(|assignment| Assignment::parse(assignment).expect("Could not parse assignment"))
@@ -51,7 +64,7 @@ impl IliasElement for Exercise {
         Ok(Exercise {
             name,
             description,
-            assignments
+            assignments,
         })
     }
 }

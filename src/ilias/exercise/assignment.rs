@@ -6,7 +6,8 @@ use reqwest::blocking::multipart::Form;
 use scraper::{selectable::Selectable, ElementRef, Selector};
 
 use crate::{
-    ilias::{client::IliasClient, file::File, parse_date, IliasElement}, uploaders::{file_data::FileData, file_with_filename::AddFileWithFilename}
+    ilias::{client::IliasClient, file::File, parse_date, IliasElement},
+    uploaders::{file_data::FileData, file_with_filename::AddFileWithFilename},
 };
 
 #[derive(Debug)]
@@ -39,7 +40,11 @@ impl IliasElement for Assignment {
     }
 
     fn querypath_from_id(id: &str) -> String {
-        format!("goto.php?target={}_{}&client_id=produktiv", Self::type_identifier(), id)
+        format!(
+            "goto.php?target={}_{}&client_id=produktiv",
+            Self::type_identifier(),
+            id
+        )
     }
 
     fn parse(element: ElementRef) -> Result<Self> {
@@ -175,8 +180,7 @@ impl IliasElement for Assignment {
             instructions,
             submission_date,
             attachments,
-            submission: submission_page_querypath
-                .map(Submission::Unresolved),
+            submission: submission_page_querypath.map(Submission::Unresolved),
         })
     }
 }
@@ -187,27 +191,25 @@ impl Assignment {
     }
 
     pub fn get_submission(&mut self, ilias_client: &IliasClient) -> Option<&AssignmentSubmission> {
-        self.submission.as_mut().map(|submission| {
-                match submission {
-                    Submission::Parsed(ass_sub) => ass_sub,
-                    Submission::Unresolved(querypath) => {
-                        let ass_sub = AssignmentSubmission::parse_submissions_page(
-                            &ilias_client
-                                .get_querypath(querypath)
-                                .expect("Could not get submission page")
-                                .root_element(),
-                            ilias_client,
-                        )
-                        .expect("Could not parse submission page");
-                        *submission = Submission::Parsed(ass_sub);
+        self.submission.as_mut().map(|submission| match submission {
+            Submission::Parsed(ass_sub) => ass_sub,
+            Submission::Unresolved(querypath) => {
+                let ass_sub = AssignmentSubmission::parse_submissions_page(
+                    &ilias_client
+                        .get_querypath(querypath)
+                        .expect("Could not get submission page")
+                        .root_element(),
+                    ilias_client,
+                )
+                .expect("Could not parse submission page");
+                *submission = Submission::Parsed(ass_sub);
 
-                        match submission {
-                            Submission::Parsed(ref x) => x,
-                            _ => unreachable!(),
-                        }
-                    }
+                match submission {
+                    Submission::Parsed(ref x) => x,
+                    _ => unreachable!(),
                 }
-            })
+            }
+        })
     }
 }
 
@@ -314,7 +316,11 @@ impl AssignmentSubmission {
     }
 
     pub fn delete_files(&self, ilias_client: &IliasClient, files: &[&File]) -> Result<()> {
-        let mut form_args = files.iter().map(|&file| file.id.clone().expect("Files to delete must have an id")).map(|id| ("delivered[]", id)).collect::<Vec<_>>();
+        let mut form_args = files
+            .iter()
+            .map(|&file| file.id.clone().expect("Files to delete must have an id"))
+            .map(|id| ("delivered[]", id))
+            .collect::<Vec<_>>();
         form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));
 
         ilias_client.post_querypath_form(&self.delete_querypath, &form_args)
@@ -323,15 +329,15 @@ impl AssignmentSubmission {
     pub fn upload_files(&self, ilias_client: &IliasClient, files: &[FileData]) -> Result<()> {
         let mut form = Form::new();
 
-
         for (index, file_data) in files.iter().enumerate() {
-            form = form.file_with_name(
-                format!("deliver[{}]", index),
-                file_data.path.clone(),
-                file_data.name.clone(),
-            )?
-            .text("cmd[uploadFile]", "Hochladen")
-            .text("ilfilehash", "aaaa");
+            form = form
+                .file_with_name(
+                    format!("deliver[{}]", index),
+                    file_data.path.clone(),
+                    file_data.name.clone(),
+                )?
+                .text("cmd[uploadFile]", "Hochladen")
+                .text("ilfilehash", "aaaa");
         }
 
         ilias_client.post_querypath_multipart(&self.upload_querypath, form)?;

@@ -1,19 +1,9 @@
-use std::{
-    env,
-    fmt::Display,
-    fs,
-    path::Path,
-};
+use std::{env, fmt::Display, fs, path::Path};
 
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect, Password, Select};
-use ilias::{
-    client::IliasClient,
-    exercise::assignment::Assignment,
-    folder::Folder,
-    IliasElement,
-};
+use ilias::{client::IliasClient, exercise::assignment::Assignment, folder::Folder, IliasElement};
 use keyring::Entry;
 use preselect_delete_setting::PreselectDeleteSetting;
 use reqwest::Url;
@@ -128,7 +118,7 @@ fn main() -> Result<()> {
             let exercise = Exercise::parse(
                 ilias_client
                     .get_querypath(&Exercise::querypath_from_id(&ilias_id))?
-                    .root_element()
+                    .root_element(),
             )?;
 
             let mut active_assignments = exercise
@@ -164,7 +154,7 @@ fn main() -> Result<()> {
             let folder = Folder::parse(
                 ilias_client
                     .get_querypath(&Folder::querypath_from_id(&ilias_id))?
-                    .root_element()
+                    .root_element(),
             )?;
             upload_files(
                 &ilias_client,
@@ -196,11 +186,8 @@ where
             .unwrap();
 
         if delete {
-            let preselection = target.preselect_files(
-                preselect_delete_setting,
-                transformed_files,
-                existing_files,
-            );
+            let preselection =
+                target.preselect_files(preselect_delete_setting, transformed_files, existing_files);
 
             let selection = MultiSelect::with_theme(&ColorfulTheme::default())
                 .with_prompt("Which files do you want to delete")
@@ -218,7 +205,8 @@ where
 
     println!(
         "Uploaded {} successfully!",
-        &transformed_files.iter()
+        &transformed_files
+            .iter()
             .map(|item| format!("{} as {}", item.path, item.name))
             .collect::<Vec<String>>()
             .join(", ")

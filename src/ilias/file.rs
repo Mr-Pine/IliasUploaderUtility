@@ -9,7 +9,7 @@ pub struct File {
     pub description: String,
     pub date: Option<DateTime<Local>>,
     pub download_querypath: Option<String>,
-    pub id: Option<String>
+    pub id: Option<String>,
 }
 
 impl Display for File {
