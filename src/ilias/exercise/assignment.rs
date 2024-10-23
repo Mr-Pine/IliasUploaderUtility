@@ -140,6 +140,7 @@ impl IliasElement for Assignment {
 
                     File {
                         name: filename,
+                        description: "".to_string(),
                         download_querypath: Some(download_link.to_string()),
                         date: None,
                         id: None,
@@ -276,6 +277,7 @@ impl AssignmentSubmission {
                 File {
                     id: Some(id.to_string()),
                     name: file_name,
+                    description: "".to_string(),
                     date: Some(submission_date),
                     download_querypath: Some(download_querypath.to_string()),
                 }
@@ -318,7 +320,7 @@ impl AssignmentSubmission {
         let mut form_args = files.into_iter().map(|file| file.id.expect("Files to delete must have an id")).map(|id| ("delivered[]", id)).collect::<Vec<_>>();
         form_args.push(("cmd[deleteDelivered]", String::from("Löschen")));
 
-        ilias_client.push_querypath_form(&self.delete_querypath, &form_args)
+        ilias_client.post_querypath_form(&self.delete_querypath, &form_args)
     }
 
     pub fn upload_files<I: IntoIterator<Item = FileData>>(&self, ilias_client: &IliasClient, files: I) -> Result<()> {
@@ -335,7 +337,7 @@ impl AssignmentSubmission {
             .text("ilfilehash", "aaaa");
         }
 
-        ilias_client.push_querypath_multipart(&self.delete_querypath, form)
+        ilias_client.post_querypath_multipart(&self.upload_querypath, form)
         // TODO: Maybe push files to submission here
     }
 }

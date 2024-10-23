@@ -1,5 +1,5 @@
 use anyhow::{Ok, Result};
-use reqwest::{blocking::{multipart, Client}, Url};
+use reqwest::{blocking::{multipart, Client, Response}, Url};
 use scraper::Html;
 use serde::Serialize;
 
@@ -28,7 +28,7 @@ impl IliasClient {
         Ok(html)
     }
 
-    pub fn push_querypath_form<T: Serialize + ?Sized>(&self, querypath: &str, form: &T) -> Result<()> {
+    pub fn post_querypath_form<T: Serialize + ?Sized>(&self, querypath: &str, form: &T) -> Result<()> {
         let mut url = self.base_url.clone();
         url.set_querypath(querypath);
 
@@ -37,12 +37,12 @@ impl IliasClient {
         Ok(())
     }
 
-    pub fn push_querypath_multipart(&self, querypath: &str, form: multipart::Form) -> Result<()> {
+    pub fn post_querypath_multipart(&self, querypath: &str, form: multipart::Form) -> Result<Response> {
         let mut url = self.base_url.clone();
         url.set_querypath(querypath);
 
         let response = self.client.post(url).multipart(form).send()?;
-        response.error_for_status()?;
-        Ok(())
+
+        Ok(response.error_for_status()?)
     }
 }
