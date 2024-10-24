@@ -1,12 +1,14 @@
+use std::{borrow::Cow, path::Path};
+
 use anyhow::{anyhow, Context, Ok, Result};
 use reqwest::{
-    blocking::{multipart, Client, Response},
+    blocking::{multipart::{self, Form, Part}, Client, Response},
     Url,
 };
 use scraper::{Html, Selector};
 use serde::Serialize;
 
-use crate::util::Querypath;
+use super::Querypath;
 
 #[derive(Debug)]
 pub struct IliasClient {
@@ -152,5 +154,24 @@ impl IliasClient {
         } else {
             Err(anyhow!("Ilias login not successful!"))
         }
+    }
+}
+
+pub trait AddFileWithFilename {
+    fn file_with_name<T, U, V>(self, name: T, path: U, filename: V) -> Result<Form>
+    where
+        T: Into<Cow<'static, str>>,
+        U: AsRef<Path>,
+        V: Into<Cow<'static, str>>;
+}
+
+impl AddFileWithFilename for Form {
+    fn file_with_name<T, U, V>(self, name: T, path: U, filename: V) -> Result<Form>
+    where
+        T: Into<Cow<'static, str>>,
+        U: AsRef<Path>,
+        V: Into<Cow<'static, str>>,
+    {
+        Ok(self.part(name, Part::file(path)?.file_name(filename)))
     }
 }

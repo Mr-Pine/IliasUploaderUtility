@@ -6,9 +6,7 @@ use reqwest::{blocking::multipart::Form, Url};
 use scraper::{element_ref::Select, selectable::Selectable, ElementRef, Selector};
 use serde::{Deserialize, Serialize};
 
-use crate::{uploaders::file_data::FileData, util::Querypath};
-
-use super::{client::IliasClient, file::File, parse_date, IliasElement};
+use super::{client::IliasClient, file::File, local_file::NamedLocalFile, parse_date, IliasElement, Querypath};
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -139,7 +137,7 @@ static MAIN_FORM_SELECTOR: OnceLock<Selector> = OnceLock::new();
 static SCRIPT_TAG_SELECTOR: OnceLock<Selector> = OnceLock::new();
 
 impl Folder {
-    pub fn upload_files(&self, ilias_client: &IliasClient, files: &[FileData]) -> Result<()> {
+    pub fn upload_files(&self, ilias_client: &IliasClient, files: &[NamedLocalFile]) -> Result<()> {
         let upload_page = ilias_client.get_querypath(
             &self
                 .upload_page_querypath

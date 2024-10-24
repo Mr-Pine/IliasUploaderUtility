@@ -5,10 +5,7 @@ use chrono::{DateTime, Local};
 use reqwest::blocking::multipart::Form;
 use scraper::{selectable::Selectable, ElementRef, Selector};
 
-use crate::{
-    ilias::{client::IliasClient, file::File, parse_date, IliasElement},
-    uploaders::{file_data::FileData, file_with_filename::AddFileWithFilename},
-};
+use super::super::{client::{AddFileWithFilename, IliasClient}, file::File, local_file::NamedLocalFile, parse_date, IliasElement};
 
 #[derive(Debug)]
 pub enum Submission {
@@ -326,7 +323,7 @@ impl AssignmentSubmission {
         ilias_client.post_querypath_form(&self.delete_querypath, &form_args)
     }
 
-    pub fn upload_files(&self, ilias_client: &IliasClient, files: &[FileData]) -> Result<()> {
+    pub fn upload_files(&self, ilias_client: &IliasClient, files: &[NamedLocalFile]) -> Result<()> {
         let mut form = Form::new();
 
         for (index, file_data) in files.iter().enumerate() {

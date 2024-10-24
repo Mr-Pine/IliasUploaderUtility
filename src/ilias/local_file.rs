@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub struct FileData {
+pub struct NamedLocalFile {
     pub path: String,
     pub name: String,
 }

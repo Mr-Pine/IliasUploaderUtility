@@ -7,7 +7,7 @@ use ilias::{client::IliasClient, exercise::assignment::Assignment, folder::Folde
 use keyring::Entry;
 use preselect_delete_setting::PreselectDeleteSetting;
 use reqwest::Url;
-use util::{UploadType, ILIAS_URL};
+use util::UploadType;
 
 mod arguments;
 mod config;
@@ -20,9 +20,9 @@ mod util;
 use crate::{
     arguments::Arguments,
     config::Config,
-    ilias::exercise::Exercise,
+    ilias::{exercise::Exercise, local_file::NamedLocalFile, ILIAS_URL},
     transform::Transformer,
-    uploaders::{file_data::FileData, upload_provider::UploadProvider},
+    uploaders::upload_provider::UploadProvider,
 };
 
 fn main() -> Result<()> {
@@ -97,7 +97,7 @@ fn main() -> Result<()> {
     let transformed_file_data = cli_args
         .file_paths
         .iter()
-        .map(|path| FileData {
+        .map(|path| NamedLocalFile {
             name: match match &transformer {
                 Some(transformer) => transformer.transform(path),
                 None => None,
@@ -170,7 +170,7 @@ fn main() -> Result<()> {
 fn upload_files<T: UploadProvider>(
     ilias_client: &IliasClient,
     target: &T,
-    transformed_files: &[FileData],
+    transformed_files: &[NamedLocalFile],
     upload_type: UploadType,
     preselect_delete_setting: PreselectDeleteSetting,
 ) -> Result<()>

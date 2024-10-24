@@ -1,12 +1,16 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Days, Local, NaiveTime, TimeZone};
 use regex::Regex;
+use reqwest::Url;
 use scraper::ElementRef;
 
 pub mod client;
 pub mod exercise;
 pub mod file;
 pub mod folder;
+pub mod local_file;
+
+pub const ILIAS_URL: &str = "https://ilias.studium.kit.edu";
 
 pub trait IliasElement: Sized {
     fn type_identifier() -> &'static str;
@@ -80,4 +84,21 @@ fn parse_date(date_string: &str) -> Result<DateTime<Local>> {
         .earliest()
         .context("Could not set time")?;
     Ok(datetime)
+}
+
+pub trait Querypath {
+    fn get_querypath(&self) -> String;
+    fn set_querypath(&mut self, querypath: &str);
+}
+
+impl Querypath for Url {
+    fn get_querypath(&self) -> String {
+        format!("{}?{}", self.path(), self.query().unwrap_or(""))
+    }
+
+    fn set_querypath(&mut self, querypath: &str) {
+        let mut parts = querypath.split("?");
+        self.set_path(parts.next().unwrap());
+        self.set_query(parts.next());
+    }
 }

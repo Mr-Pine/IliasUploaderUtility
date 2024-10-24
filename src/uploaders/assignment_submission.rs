@@ -1,15 +1,15 @@
 use crate::{
-    ilias::{client::IliasClient, exercise::assignment::AssignmentSubmission, file::File},
+    ilias::{client::IliasClient, exercise::assignment::AssignmentSubmission, file::File, local_file::NamedLocalFile},
     preselect_delete_setting::PreselectDeleteSetting,
 };
 use anyhow::Result;
 
-use super::{file_data::FileData, upload_provider::UploadProvider};
+use super::upload_provider::UploadProvider;
 
 impl UploadProvider for AssignmentSubmission {
     type UploadedFile = File;
 
-    fn upload_files(&self, ilias_client: &IliasClient, file_data: &[FileData]) -> Result<()> {
+    fn upload_files(&self, ilias_client: &IliasClient, file_data: &[NamedLocalFile]) -> Result<()> {
         self.upload_files(ilias_client, file_data)
     }
 
@@ -28,7 +28,7 @@ impl UploadProvider for AssignmentSubmission {
     fn preselect_files<'a>(
         &self,
         preselect_setting: PreselectDeleteSetting,
-        upload_files: &[FileData],
+        upload_files: &[NamedLocalFile],
         existing_files: Vec<&'a Self::UploadedFile>,
     ) -> Vec<(&'a Self::UploadedFile, bool)> {
         existing_files
