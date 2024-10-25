@@ -6,7 +6,10 @@ use reqwest::{blocking::multipart::Form, Url};
 use scraper::{element_ref::Select, selectable::Selectable, ElementRef, Selector};
 use serde::{Deserialize, Serialize};
 
-use super::{client::IliasClient, file::File, local_file::NamedLocalFile, parse_date, IliasElement, Querypath};
+use super::{
+    client::IliasClient, file::File, local_file::NamedLocalFile, parse_date, IliasElement,
+    Querypath,
+};
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -250,15 +253,20 @@ impl FolderElement {
                 .next()
                 .expect("Could not find file extension")
                 .text()
-                .collect();
-            let mut date = None;
-            while date.is_none() {
+                .collect::<String>().trim().to_string();
+            let date = loop {
                 let next_property = properties.next();
-                if next_property.is_none() {
-                    continue;
+                match next_property {
+                    Some(property) => {
+                        let date = parse_date(&property.text().collect::<String>());
+                        match date {
+                            Ok(date) => break Some(date),
+                            Err(_) => continue,
+                        }
+                    }
+                    None => break None,
                 }
-                date = parse_date(&next_property.unwrap().text().collect::<String>()).ok();
-            }
+            };
 
             let id = Regex::new("target=file_(?<id>\\d+)")
                 .unwrap()
@@ -266,8 +274,12 @@ impl FolderElement {
                 .expect("Could not capture id")
                 .name("id")
                 .expect("Could not get id")
-                .as_str();
-            let name = format!("{}.{}", name, extension);
+                .as_str().to_string();
+            let name = if extension.len() > 0 {
+                format!("{}.{}", name, extension)
+            } else {
+                name
+            };
 
             let file = File {
                 name,
