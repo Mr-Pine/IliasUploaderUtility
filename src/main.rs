@@ -119,6 +119,7 @@ fn main() -> Result<()> {
                 ilias_client
                     .get_querypath(&Exercise::querypath_from_id(&ilias_id))?
                     .root_element(),
+                &ilias_client,
             )?;
 
             let mut active_assignments = exercise
@@ -127,7 +128,7 @@ fn main() -> Result<()> {
                 .filter(Assignment::is_active)
                 .collect::<Vec<_>>();
 
-            if active_assignments.len() == 0 {
+            if active_assignments.is_empty() {
                 return Err(anyhow!("No active assignments"));
             }
             let selected_index = Select::with_theme(&ColorfulTheme::default())
@@ -159,6 +160,7 @@ fn main() -> Result<()> {
                 ilias_client
                     .get_querypath(&Folder::querypath_from_id(&ilias_id))?
                     .root_element(),
+                &ilias_client
             )?;
             upload_files(
                 &ilias_client,

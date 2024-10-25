@@ -51,7 +51,7 @@ impl IliasElement for Assignment {
         )
     }
 
-    fn parse(element: ElementRef) -> Result<Self> {
+    fn parse(element: ElementRef, _ilias_client: &IliasClient) -> Result<Self> {
         let name_selector = NAME_SELECTOR.get_or_init(|| {
             Selector::parse(".ilAssignmentHeader").expect("Could not parse selector")
         });
@@ -120,10 +120,10 @@ impl IliasElement for Assignment {
             .context("Did not find schedule")?;
         let submission_start_date =
             Self::get_value_for_keys(schedule_info, &["Startzeit", "Start Time"])?;
-        let submission_start_date = parse_date(&submission_start_date.trim())?;
+        let submission_start_date = parse_date(submission_start_date.trim())?;
         let submission_end_date =
             Self::get_value_for_keys(schedule_info, &["Abgabetermin", "Edit Until"])?;
-        let submission_end_date = parse_date(&submission_end_date.trim())?;
+        let submission_end_date = parse_date(submission_end_date.trim())?;
 
         let attachment_info = info_screens.iter().find_map(|(screen, name)| {
             if ["Dateien", "Files"].contains(&name.as_str()) {
@@ -229,7 +229,7 @@ impl Assignment {
             Selector::parse(".il_InfoScreenProperty").expect("Could not parse selector")
         });
 
-        Ok(info_screen
+        info_screen
             .select(property_row_selector)
             .find(|&element| {
                 keys.contains(
@@ -245,7 +245,7 @@ impl Assignment {
             .context(anyhow!("Did not find {:?} property", keys))?
             .select(info_property_value_selector)
             .next()
-            .context(anyhow!("Did not find value for {:?} property", keys))?)
+            .context(anyhow!("Did not find value for {:?} property", keys))
     }
 
     fn get_value_for_keys(info_screen: ElementRef, keys: &[&str]) -> Result<String> {

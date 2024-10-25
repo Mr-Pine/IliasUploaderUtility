@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, fmt::Debug, path::Path};
 
 use anyhow::{anyhow, Context, Ok, Result};
 use reqwest::{
@@ -33,7 +33,7 @@ impl IliasClient {
         Ok(html)
     }
 
-    pub fn post_querypath_form<T: Serialize + ?Sized>(
+    pub fn post_querypath_form<T: Serialize + ?Sized + Debug>(
         &self,
         querypath: &str,
         form: &T,
@@ -42,7 +42,9 @@ impl IliasClient {
         url.set_querypath(querypath);
 
         let response = self.client.post(url).form(form).send()?;
-        response.error_for_status()?;
+        if response.url().as_str().contains("error") {
+            return Err(anyhow!("Ilias error page"));
+        }
         Ok(())
     }
 
