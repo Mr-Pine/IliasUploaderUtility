@@ -27,7 +27,7 @@ fn parse_date(date_string: &str) -> Result<DateTime<Local>> {
     let date = date.trim();
     let time = time.trim();
 
-    let time = NaiveTime::parse_from_str(time, "%H:%M:%S")?;
+    let time = NaiveTime::parse_from_str(time, "%H:%M")?;
 
     let date = if ["Gestern", "Yesterday"].contains(&date) {
         Local::now() - Days::new(1)
@@ -36,13 +36,14 @@ fn parse_date(date_string: &str) -> Result<DateTime<Local>> {
     } else if ["Morgen", "Tomorrow"].contains(&date) {
         Local::now() + Days::new(1)
     } else {
-        let months: [&[&str]; 11] = [
+        let months: [&[&str]; 12] = [
             &["Jan"],
             &["Feb"],
             &["Mär", "Mar"],
             &["Apr"],
             &["Mai", "May"],
             &["Jun"],
+            &["Jul"],
             &["Aug"],
             &["Sep"],
             &["Okt", "Oct"],
@@ -52,8 +53,8 @@ fn parse_date(date_string: &str) -> Result<DateTime<Local>> {
 
         let date_regex = Regex::new("^(?<day>\\d+)\\. (?<month>\\w+) (?<year>\\w+)$")?;
         let date_split = date_regex
-            .captures(date_string)
-            .context(anyhow!("Could not match date {}", date_string))?;
+            .captures(date)
+            .context(anyhow!("Could not match date {}", date))?;
         let (day, month, year) = (
             date_split.name("day").unwrap().as_str(),
             date_split.name("month").unwrap().as_str(),
@@ -65,7 +66,7 @@ fn parse_date(date_string: &str) -> Result<DateTime<Local>> {
             .enumerate()
             .find_map(|(index, &names)| {
                 if names.contains(&month) {
-                    Some(index as u32)
+                    Some(index as u32 + 1)
                 } else {
                     None
                 }

@@ -5,7 +5,12 @@ use chrono::{DateTime, Local};
 use reqwest::blocking::multipart::Form;
 use scraper::{selectable::Selectable, ElementRef, Selector};
 
-use super::super::{client::{AddFileWithFilename, IliasClient}, file::File, local_file::NamedLocalFile, parse_date, IliasElement};
+use super::super::{
+    client::{AddFileWithFilename, IliasClient},
+    file::File,
+    local_file::NamedLocalFile,
+    parse_date, IliasElement,
+};
 
 #[derive(Debug)]
 pub enum Submission {
@@ -17,8 +22,9 @@ pub enum Submission {
 #[allow(dead_code)]
 pub struct Assignment {
     pub name: String,
-    pub instructions: String,
-    pub submission_date: DateTime<Local>,
+    pub instructions: Option<String>,
+    pub submission_start_date: DateTime<Local>,
+    pub submission_end_date: DateTime<Local>,
     pub attachments: Vec<File>,
     submission: Option<Submission>,
 }
@@ -27,8 +33,9 @@ static INFO_SCREEN_SELECTOR: OnceLock<Selector> = OnceLock::new();
 static INFO_SCREEN_NAME_SELECTOR: OnceLock<Selector> = OnceLock::new();
 
 static NAME_SELECTOR: OnceLock<Selector> = OnceLock::new();
-static FIRST_INFO_VALUE_SELECTOR: OnceLock<Selector> = OnceLock::new();
-static ATTACHMENT_ROW_SELECTOR: OnceLock<Selector> = OnceLock::new();
+static INFO_PROPERTY_VALUE_SELECTOR: OnceLock<Selector> = OnceLock::new();
+static INFO_PROPERTY_KEY_SELECTOR: OnceLock<Selector> = OnceLock::new();
+static PROPERTY_ROW_SELECTOR: OnceLock<Selector> = OnceLock::new();
 static SUBMISSION_PAGE_SELECTOR: OnceLock<Selector> = OnceLock::new();
 
 impl IliasElement for Assignment {
@@ -53,10 +60,10 @@ impl IliasElement for Assignment {
             .get_or_init(|| Selector::parse(".ilInfoScreenSec").expect("Could not parse selector"));
         let info_screen_name_selector = INFO_SCREEN_NAME_SELECTOR
             .get_or_init(|| Selector::parse(".ilHeader").expect("Could not parse selector"));
-        let first_info_value_selector = FIRST_INFO_VALUE_SELECTOR.get_or_init(|| {
+        let info_property_value_selector = INFO_PROPERTY_VALUE_SELECTOR.get_or_init(|| {
             Selector::parse(".il_InfoScreenPropertyValue").expect("Could not parse selector")
         });
-        let attachment_row_selector = ATTACHMENT_ROW_SELECTOR
+        let property_row_selector = PROPERTY_ROW_SELECTOR
             .get_or_init(|| Selector::parse(".form-group").expect("Could not parse selector"));
         let submission_page_selector = SUBMISSION_PAGE_SELECTOR
             .get_or_init(|| Selector::parse("a").expect("Could not parse selector"));
@@ -84,40 +91,39 @@ impl IliasElement for Assignment {
             })
             .collect();
 
-        let instruction_info = info_screens
-            .iter()
-            .find_map(|(screen, name)| {
-                if ["Arbeitsanweisung", "Work Instructions"].contains(&name.as_str()) {
-                    Some(screen)
-                } else {
-                    None
-                }
-            })
-            .context("Did not find any instructions")?;
-        let instructions = instruction_info
-            .select(first_info_value_selector)
-            .next()
-            .context("Did not find instruction text")?
-            .text()
-            .collect();
+        let instruction_info = info_screens.iter().find_map(|(screen, name)| {
+            if ["Arbeitsanweisung", "Work Instructions"].contains(&name.as_str()) {
+                Some(screen)
+            } else {
+                None
+            }
+        });
+        let instructions = instruction_info.and_then(|instruction_info| {
+            Some(
+                instruction_info
+                    .select(info_property_value_selector)
+                    .next()?
+                    .text()
+                    .collect(),
+            )
+        });
 
         let schedule_info = info_screens
             .iter()
             .find_map(|(screen, name)| {
                 if ["Schedule", "Terminplan"].contains(&name.as_str()) {
-                    Some(screen)
+                    Some(*screen)
                 } else {
                     None
                 }
             })
             .context("Did not find schedule")?;
-        let submission_date: String = schedule_info
-            .select(first_info_value_selector)
-            .next()
-            .context("Did not find date")?
-            .text()
-            .collect();
-        let submission_date = parse_date(&submission_date)?;
+        let submission_start_date =
+            Self::get_value_for_keys(schedule_info, &["Startzeit", "Start Time"])?;
+        let submission_start_date = parse_date(&submission_start_date.trim())?;
+        let submission_end_date =
+            Self::get_value_for_keys(schedule_info, &["Abgabetermin", "Edit Until"])?;
+        let submission_end_date = parse_date(&submission_end_date.trim())?;
 
         let attachment_info = info_screens.iter().find_map(|(screen, name)| {
             if ["Dateien", "Files"].contains(&name.as_str()) {
@@ -127,7 +133,7 @@ impl IliasElement for Assignment {
             }
         });
         let attachments = attachment_info.map_or(vec![], |attachment_info| {
-            let file_rows = attachment_info.select(attachment_row_selector);
+            let file_rows = attachment_info.select(property_row_selector);
             file_rows
                 .map(|file_row| {
                     let mut children = file_row.child_elements();
@@ -156,26 +162,27 @@ impl IliasElement for Assignment {
                 .collect()
         });
 
-        let submission_info = info_screens
-            .iter()
-            .find_map(|(screen, name)| {
-                if ["Ihre Einreichung", "Your Submission"].contains(&name.as_str()) {
-                    Some(screen)
-                } else {
-                    None
-                }
-            })
-            .context("Did not find submission info")?;
+        let submission_info = info_screens.iter().find_map(|(screen, name)| {
+            if ["Ihre Einreichung", "Your Submission"].contains(&name.as_str()) {
+                Some(*screen)
+            } else {
+                None
+            }
+        });
         let submission_page_querypath = submission_info
-            .select(submission_page_selector)
-            .next()
+            .and_then(|info| {
+                Self::get_value_element_for_keys(info, &["Abgegebene Dateien", "Submitted Files"])
+                    .ok()
+            })
+            .and_then(|info| info.select(submission_page_selector).next())
             .map(|link| link.attr("href").expect("Could not find href in link"))
             .map(|querypath| querypath.to_string());
 
         Ok(Assignment {
             name,
             instructions,
-            submission_date,
+            submission_start_date,
+            submission_end_date,
             attachments,
             submission: submission_page_querypath.map(Submission::Unresolved),
         })
@@ -184,7 +191,7 @@ impl IliasElement for Assignment {
 
 impl Assignment {
     pub fn is_active(&self) -> bool {
-        self.submission_date > Local::now()
+        self.submission_end_date >= Local::now() && self.submission_start_date <= Local::now()
     }
 
     pub fn get_submission(&mut self, ilias_client: &IliasClient) -> Option<&AssignmentSubmission> {
@@ -207,6 +214,44 @@ impl Assignment {
                 }
             }
         })
+    }
+
+    fn get_value_element_for_keys<'a>(
+        info_screen: ElementRef<'a>,
+        keys: &[&str],
+    ) -> Result<ElementRef<'a>> {
+        let property_row_selector = PROPERTY_ROW_SELECTOR
+            .get_or_init(|| Selector::parse(".form-group").expect("Could not parse selector"));
+        let info_property_value_selector = INFO_PROPERTY_VALUE_SELECTOR.get_or_init(|| {
+            Selector::parse(".il_InfoScreenPropertyValue").expect("Could not parse selector")
+        });
+        let info_property_key_selector = INFO_PROPERTY_KEY_SELECTOR.get_or_init(|| {
+            Selector::parse(".il_InfoScreenProperty").expect("Could not parse selector")
+        });
+
+        Ok(info_screen
+            .select(property_row_selector)
+            .find(|&element| {
+                keys.contains(
+                    &element
+                        .select(info_property_key_selector)
+                        .next()
+                        .expect("Property without key")
+                        .text()
+                        .collect::<String>()
+                        .as_str(),
+                )
+            })
+            .context(anyhow!("Did not find {:?} property", keys))?
+            .select(info_property_value_selector)
+            .next()
+            .context(anyhow!("Did not find value for {:?} property", keys))?)
+    }
+
+    fn get_value_for_keys(info_screen: ElementRef, keys: &[&str]) -> Result<String> {
+        Ok(Self::get_value_element_for_keys(info_screen, keys)?
+            .text()
+            .collect())
     }
 }
 
@@ -237,6 +282,7 @@ impl AssignmentSubmission {
 
         let file_rows = submission_page.select(file_row_selector);
         let uploaded_files = file_rows
+            .filter(|&row| row.child_elements().count() > 1)
             .map(|file_row| {
                 let mut children = file_row.child_elements();
 
@@ -253,17 +299,22 @@ impl AssignmentSubmission {
                     .expect("Did not find second column")
                     .text()
                     .collect();
-                let submission_date = parse_date(
-                    &children
-                        .next()
-                        .expect("Did not find third column")
-                        .text()
-                        .collect::<String>(),
-                )
-                .expect("Could not parse date");
-                let download_querypath = children
-                    .next()
-                    .expect("Did not find fourth column")
+                let submission_date = loop {
+                    let parsed_date = parse_date(
+                        &children
+                            .next()
+                            .expect("Did not find date column")
+                            .text()
+                            .collect::<String>(),
+                    );
+                    match parsed_date {
+                        Ok(date) => break date,
+                        _ => continue,
+                    }
+                };
+                let download_querypath =  children
+                    .last()
+                    .expect("Did not find last column")
                     .child_elements()
                     .next()
                     .expect("Did not find download link")

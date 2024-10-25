@@ -126,6 +126,10 @@ fn main() -> Result<()> {
                 .into_iter()
                 .filter(Assignment::is_active)
                 .collect::<Vec<_>>();
+
+            if active_assignments.len() == 0 {
+                return Err(anyhow!("No active assignments"));
+            }
             let selected_index = Select::with_theme(&ColorfulTheme::default())
                 .with_prompt("Assignment to upload to:")
                 .default(0)
