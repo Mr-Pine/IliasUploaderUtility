@@ -1,6 +1,8 @@
 use anyhow::Result;
 
-use crate::{ilias::{client::IliasClient, local_file::NamedLocalFile}, preselect_delete_setting::PreselectDeleteSetting};
+use ilias::{client::IliasClient, local_file::NamedLocalFile};
+
+use crate::preselect_delete_setting::PreselectDeleteSetting;
 
 pub trait UploadProvider {
     type UploadedFile: ToString;

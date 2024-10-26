@@ -1,11 +1,10 @@
 use anyhow::{Ok, Result};
 
-use crate::{
-    ilias::{
-        client::IliasClient,
-        folder::{Folder, FolderElement}, local_file::NamedLocalFile,
-    },
-    preselect_delete_setting::PreselectDeleteSetting,
+use crate::preselect_delete_setting::PreselectDeleteSetting;
+use ilias::{
+    client::IliasClient,
+    folder::{Folder, FolderElement},
+    local_file::NamedLocalFile,
 };
 
 use super::upload_provider::UploadProvider;

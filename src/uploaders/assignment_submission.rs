@@ -1,8 +1,9 @@
-use crate::{
-    ilias::{client::IliasClient, exercise::assignment::AssignmentSubmission, file::File, local_file::NamedLocalFile},
-    preselect_delete_setting::PreselectDeleteSetting,
-};
+use crate::preselect_delete_setting::PreselectDeleteSetting;
 use anyhow::Result;
+use ilias::{
+    client::IliasClient, exercise::assignment::AssignmentSubmission, file::File,
+    local_file::NamedLocalFile,
+};
 
 use super::upload_provider::UploadProvider;
 

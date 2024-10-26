@@ -8,10 +8,10 @@ use keyring::Entry;
 use preselect_delete_setting::PreselectDeleteSetting;
 use reqwest::Url;
 use util::UploadType;
+use ilias::{exercise::Exercise, local_file::NamedLocalFile, ILIAS_URL};
 
 mod arguments;
 mod config;
-mod ilias;
 mod preselect_delete_setting;
 mod transform;
 mod uploaders;
@@ -20,7 +20,6 @@ mod util;
 use crate::{
     arguments::Arguments,
     config::Config,
-    ilias::{exercise::Exercise, local_file::NamedLocalFile, ILIAS_URL},
     transform::Transformer,
     uploaders::upload_provider::UploadProvider,
 };
@@ -117,7 +116,7 @@ fn main() -> Result<()> {
         util::UploadType::Exercise => {
             let exercise = Exercise::parse(
                 ilias_client
-                    .get_querypath(&Exercise::querypath_from_id(&ilias_id))?
+                    .get_querypath(&Exercise::querypath_from_id(&ilias_id).unwrap())?
                     .root_element(),
                 &ilias_client,
             )?;
@@ -158,7 +157,7 @@ fn main() -> Result<()> {
         util::UploadType::Folder => {
             let folder = Folder::parse(
                 ilias_client
-                    .get_querypath(&Folder::querypath_from_id(&ilias_id))?
+                    .get_querypath(&Folder::querypath_from_id(&ilias_id).unwrap())?
                     .root_element(),
                 &ilias_client
             )?;
