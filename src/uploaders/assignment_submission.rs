@@ -1,15 +1,14 @@
-use anyhow::{Ok, Result};
-
 use crate::preselect_delete_setting::PreselectDeleteSetting;
+use anyhow::Result;
 use ilias::{
-    client::IliasClient,
-    folder::{Folder, FolderElement},
+    client::IliasClient, exercise::assignment::AssignmentSubmission, file::File,
     local_file::NamedLocalFile,
 };
 
 use super::upload_provider::UploadProvider;
-impl UploadProvider for Folder {
-    type UploadedFile = FolderElement;
+
+impl UploadProvider for AssignmentSubmission {
+    type UploadedFile = File;
 
     fn upload_files(&self, ilias_client: &IliasClient, file_data: &[NamedLocalFile]) -> Result<()> {
         self.upload_files(ilias_client, file_data)
@@ -20,27 +19,11 @@ impl UploadProvider for Folder {
         ilias_client: &IliasClient,
         files: &[&Self::UploadedFile],
     ) -> Result<()> {
-        for file in files {
-            file.delete(ilias_client)?;
-        }
-        Ok(())
+        self.delete_files(ilias_client, files)
     }
 
-    fn get_existing_files(&self) -> Vec<&FolderElement> {
-        let files = self
-            .elements
-            .iter()
-            .filter(|element| {
-                matches!(
-                    element,
-                    FolderElement::File {
-                        file: _,
-                        deletion_querypath: _
-                    }
-                )
-            })
-            .collect::<Vec<_>>();
-        files
+    fn get_existing_files(&self) -> Vec<&File> {
+        self.submissions.iter().collect()
     }
 
     fn preselect_files<'a>(
@@ -58,10 +41,7 @@ impl UploadProvider for Folder {
                         PreselectDeleteSetting::All => true,
                         PreselectDeleteSetting::None => false,
                         PreselectDeleteSetting::Smart => {
-                            let filename = &existing_file
-                                .file()
-                                .expect("Encountered non-file existing element")
-                                .name;
+                            let filename = &existing_file.name;
                             upload_files.iter().any(|file| file.name == *filename)
                         }
                     },

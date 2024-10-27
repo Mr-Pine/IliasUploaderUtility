@@ -27,5 +27,5 @@ pub struct Arguments {
     pub preselect_delete: Option<PreselectDeleteSetting>,
 
     #[arg(long, value_enum)]
-    pub upload_type: Option<UploadType>
+    pub upload_type: Option<UploadType>,
 }

@@ -17,27 +17,19 @@ impl Transformer {
 
         let regex = Regex::new(regex_string.context("No regex string provided")?.as_str())?;
 
-        return Ok(Some(Transformer {
-            regex: regex,
+        Ok(Some(Transformer {
+            regex,
             format: format.context("No transform format string provided")?,
-        }));
+        }))
     }
 
-    pub fn transform(
-        self: &Self,
-        filename: &str,
-    ) -> Option<String> {
+    pub fn transform(&self, filename: &str) -> Option<String> {
         let matches = self.regex.is_match(filename);
         if !matches {
             return None;
         }
-        let transformed_filename = self.regex.replace_all(
-            filename,
-            self.format.clone(),
-        );
-    
-        return Some(transformed_filename.into_owned());
-    }
-        
-}
+        let transformed_filename = self.regex.replace_all(filename, self.format.clone());
 
+        Some(transformed_filename.into_owned())
+    }
+}

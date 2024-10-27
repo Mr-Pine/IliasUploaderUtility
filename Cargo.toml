@@ -1,17 +1,18 @@
 [package]
 name = "ilias_uploader_utility"
-version = "1.1.0"
+version = "2.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reqwest ={version =  "0.11.22", features = ["cookies", "multipart", "blocking", "json"]}
-scraper = "0.17.1"
-clap = { version = "4.4.6", features = ["derive"] }
+ilias = { git = "https://github.com/Mr-Pine/ilias-rs.git" }
+
+reqwest = { version =  "0.12.8", features = ["multipart"]}
+clap = { version = "4.5.20", features = ["derive"] }
 dialoguer = "0.11.0"
-keyring = "2.0.5"
-toml = "0.8.2"
-serde = { version = "1.0.189", features = ["derive"] }
-regex = "1.10.2"
-anyhow = "1.0.75"
+keyring = { version = "3.6.0", features = ["apple-native", "linux-native-sync-persistent", "windows-native"] }
+toml = "0.8.19"
+serde = { version = "1.0.211", features = ["derive"] }
+regex = "1.11.1"
+anyhow = "1.0.91"

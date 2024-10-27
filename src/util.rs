@@ -1,53 +1,22 @@
 use clap::ValueEnum;
-use reqwest::Url;
 use serde::Deserialize;
-
-pub const ILIAS_URL: &str = "https://ilias.studium.kit.edu";
-
-#[macro_export]
-macro_rules! ilias_url {
-    ($id:tt, $target:expr) => {
-        Url::parse(
-            format!(
-                "https://ilias.studium.kit.edu/goto.php?target={}_{}&client_id=produktiv",
-               //https://ilias.studium.kit.edu/goto.php?target=fold_2240661&client_id=produktiv
-                UploadType::ilias_target_identifier(&$target), $id
-            )
-            .as_str(),
-        )
-    };
-}
-
-pub trait SetQuerypath {
-    fn set_querypath(self: &mut Self, querypath: &str);
-}
-
-impl SetQuerypath for Url {
-    fn set_querypath(self: &mut Self, querypath: &str) {
-        let mut parts = querypath.split("?");
-        self.set_path(parts.next().unwrap());
-        self.set_query(parts.next());
-    }   
-}
 
 #[derive(Debug, Deserialize, Clone, ValueEnum, PartialEq)]
 #[clap(rename_all = "kebab_case")]
 pub enum UploadType {
-    EXERCISE, FOLDER
+    Exercise,
+    Folder,
 }
 
 impl UploadType {
-    pub fn ilias_target_identifier(self: &Self) -> &str{
+    pub fn get_delete_message(&self) -> &str {
         match self {
-            UploadType::EXERCISE => "exc",
-            UploadType::FOLDER => "fold",
-        }
-    }
-
-    pub fn get_delete_message(self: &Self) -> &str{
-        match self {
-            UploadType::EXERCISE => "This excercise already has uploaded files. Do you want to delete them?",
-            UploadType::FOLDER => "There are files with the same name in this folder. Do you want to delete them?",
+            UploadType::Exercise => {
+                "This excercise already has uploaded files. Do you want to delete any of them?"
+            }
+            UploadType::Folder => {
+                "There are already files in this folder. Do you want to delete any of them?"
+            }
         }
     }
 }

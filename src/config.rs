@@ -9,5 +9,5 @@ pub struct Config {
     pub preselect_delete: Option<PreselectDeleteSetting>,
     pub transform_regex: Option<String>,
     pub transform_format: Option<String>,
-    pub upload_type: Option<UploadType> 
+    pub upload_type: Option<UploadType>,
 }
