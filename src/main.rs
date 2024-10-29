@@ -108,7 +108,7 @@ fn main() -> Result<()> {
                     .to_string_lossy()
                     .into_owned(),
             },
-            path: path.to_string(),
+            path: path.into(),
         })
         .collect::<Vec<_>>();
 
@@ -212,7 +212,7 @@ where
         "Uploaded {} successfully!",
         &transformed_files
             .iter()
-            .map(|item| format!("{} as {}", item.path, item.name))
+            .map(|item| format!("{:?} as {}", item.path, item.name))
             .collect::<Vec<String>>()
             .join(", ")
     );

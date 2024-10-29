@@ -906,6 +906,7 @@ dependencies = [
 [[package]]
 name = "ilias"
 version = "0.1.0"
+source = "git+https://github.com/Mr-Pine/ilias-rs.git#b05014d97c06a0f30138e9e93a7ed90aca53f7f6"
 dependencies = [
  "anyhow",
  "base64",
