@@ -21,7 +21,7 @@
           ilias-uploader = naersk'.buildPackage
             {
               root = ./.;
-              nativeBuildInputs = with pkgs; [ pkg-config openssl ];
+              nativeBuildInputs = with pkgs; [ pkg-config openssl dbus ];
             };
           default = ilias-uploader;
         }
