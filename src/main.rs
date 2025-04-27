@@ -3,12 +3,14 @@ use std::{env, fmt::Display, fs, path::Path};
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect, Password, Select};
+use env_logger::Env;
 use ilias::{client::IliasClient, exercise::assignment::Assignment, folder::Folder, IliasElement};
+use ilias::{exercise::Exercise, local_file::NamedLocalFile, ILIAS_URL};
 use keyring::Entry;
+use log::info;
 use preselect_delete_setting::PreselectDeleteSetting;
 use reqwest::Url;
 use util::UploadType;
-use ilias::{exercise::Exercise, local_file::NamedLocalFile, ILIAS_URL};
 
 mod arguments;
 mod config;
@@ -18,13 +20,13 @@ mod uploaders;
 mod util;
 
 use crate::{
-    arguments::Arguments,
-    config::Config,
-    transform::Transformer,
+    arguments::Arguments, config::Config, transform::Transformer,
     uploaders::upload_provider::UploadProvider,
 };
 
 fn main() -> Result<()> {
+    let env = Env::default().filter_or("RUST_LOG", "info");
+    env_logger::init_from_env(env);
     let cli_args: Arguments = Arguments::parse();
     let config_file_content = search_config(&cli_args.search_depth);
     let file_config: Config = match config_file_content {
@@ -83,7 +85,7 @@ fn main() -> Result<()> {
         },
     };
 
-    println!("Checking ilias {:?} {}", upload_type, ilias_id);
+    info!("Checking ilias {:?} {}", upload_type, ilias_id);
 
     let ilias_client = IliasClient::new(Url::parse(ILIAS_URL)?)?;
     let _ = ilias_client.authenticate(&username, &password);
@@ -159,7 +161,7 @@ fn main() -> Result<()> {
                 ilias_client
                     .get_querypath(&Folder::querypath_from_id(&ilias_id).unwrap())?
                     .root_element(),
-                &ilias_client
+                &ilias_client,
             )?;
             upload_files(
                 &ilias_client,
@@ -208,7 +210,7 @@ where
 
     target.upload_files(ilias_client, transformed_files)?;
 
-    println!(
+    info!(
         "Uploaded {} successfully!",
         &transformed_files
             .iter()
