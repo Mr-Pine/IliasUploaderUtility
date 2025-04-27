@@ -1,6 +1,5 @@
 use std::{env, fmt::Display, fs, path::Path};
 
-use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect, Password, Select};
 use env_logger::Env;
@@ -10,6 +9,7 @@ use keyring::Entry;
 use log::info;
 use preselect_delete_setting::PreselectDeleteSetting;
 use reqwest::Url;
+use snafu::{report, whatever, OptionExt, ResultExt, Whatever};
 use util::UploadType;
 
 mod arguments;
@@ -24,13 +24,14 @@ use crate::{
     uploaders::upload_provider::UploadProvider,
 };
 
-fn main() -> Result<()> {
+#[report]
+fn main() -> Result<(), Whatever> {
     let env = Env::default().filter_or("RUST_LOG", "info");
     env_logger::init_from_env(env);
     let cli_args: Arguments = Arguments::parse();
     let config_file_content = search_config(&cli_args.search_depth);
     let file_config: Config = match config_file_content {
-        Ok(content) => toml::from_str::<Config>(&content).context("Could not parse config")?,
+        Ok(content) => toml::from_str::<Config>(&content).whatever_context("Could not parse config")?,
         Err(_) => Config::default(),
     };
 
@@ -87,7 +88,7 @@ fn main() -> Result<()> {
 
     info!("Checking ilias {:?} {}", upload_type, ilias_id);
 
-    let ilias_client = IliasClient::new(Url::parse(ILIAS_URL)?)?;
+    let ilias_client = IliasClient::new(Url::parse(ILIAS_URL).whatever_context("Could not parse ilias url")?).whatever_context("Unable to get ilias client")?;
     let _ = ilias_client.authenticate(&username, &password);
 
     let transform_regex = file_config.transform_regex;
@@ -130,7 +131,7 @@ fn main() -> Result<()> {
                 .collect::<Vec<_>>();
 
             if active_assignments.is_empty() {
-                return Err(anyhow!("No active assignments"));
+                whatever!("No active assignments");
             }
             let selected_index = Select::with_theme(&ColorfulTheme::default())
                 .with_prompt("Assignment to upload to:")
@@ -147,7 +148,8 @@ fn main() -> Result<()> {
             let selected_assignment = &mut active_assignments[selected_index];
             let selected_submission = selected_assignment
                 .get_submission(&ilias_client)
-                .context("Assignment did not have a submission")?;
+                .whatever_context("Resolving submissions failed")?
+                .whatever_context("Assignment did not have a submission")?;
             upload_files(
                 &ilias_client,
                 selected_submission,
@@ -180,7 +182,7 @@ fn upload_files<T: UploadProvider>(
     transformed_files: &[NamedLocalFile],
     upload_type: UploadType,
     preselect_delete_setting: PreselectDeleteSetting,
-) -> Result<()>
+) -> Result<(), Whatever>
 where
     T::UploadedFile: Display,
 {
@@ -199,7 +201,8 @@ where
             let selection = MultiSelect::with_theme(&ColorfulTheme::default())
                 .with_prompt("Which files do you want to delete")
                 .items_checked(&preselection)
-                .interact()?
+                .interact()
+                .whatever_context("Interaction with delete promt failed")?
                 .into_iter()
                 .map(|i| preselection[i].0)
                 .collect::<Vec<_>>();
@@ -223,12 +226,12 @@ where
 
 const CONFIG_FILE_NAME: &str = ".ilias_upload";
 
-fn search_config(depth: &i16) -> Result<String> {
-    let mut current_dir = env::current_dir()?;
+fn search_config(depth: &i16) -> Result<String, Whatever> {
+    let mut current_dir = env::current_dir().whatever_context("Could not get cwd")?;
     if contains_config_file(&current_dir)? {
         return match fs::read_to_string(current_dir.join(CONFIG_FILE_NAME)) {
             Ok(file) => Ok(file),
-            Err(_) => Err(anyhow!("Could not read config file")),
+            Err(_) => whatever!("Could not read config file"),
         };
     }
 
@@ -237,17 +240,18 @@ fn search_config(depth: &i16) -> Result<String> {
         if contains_config_file(&current_dir)? {
             return match fs::read_to_string(current_dir.join(CONFIG_FILE_NAME)) {
                 Ok(file) => Ok(file),
-                Err(_) => Err(anyhow!("Could not read config file")),
+                Err(_) => whatever!("Could not read config file"),
             };
         }
     }
 
-    Err(anyhow!("Could not find config file"))
+    whatever!("Could not find config file")
 }
 
-fn contains_config_file(path: &Path) -> Result<bool> {
+fn contains_config_file(path: &Path) -> Result<bool, Whatever> {
     let found = path
-        .read_dir()?
+        .read_dir()
+        .whatever_context("Could not read directory")?
         .map(|file_res| match file_res {
             Ok(file) => file.file_name(),
             Err(_) => "".into(),

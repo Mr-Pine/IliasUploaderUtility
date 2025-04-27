@@ -6,8 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ilias = { path = "../ilias-rs" }
-#ilias = { git = "https://github.com/Mr-Pine/ilias-rs.git" }
+ilias = { git = "https://github.com/Mr-Pine/ilias-rs.git" }
 
 reqwest = { version =  "0.12.8", features = ["multipart"]}
 clap = { version = "4.5.20", features = ["derive"] }
@@ -16,6 +15,6 @@ keyring = { version = "3.6.0", features = ["apple-native", "linux-native-sync-pe
 toml = "0.8.19"
 serde = { version = "1.0.211", features = ["derive"] }
 regex = "1.11.1"
-anyhow = "1.0.91"
 env_logger = "0.11.8"
 log = "0.4.27"
+snafu = { version = "0.8.5", features = ["backtrace"] }

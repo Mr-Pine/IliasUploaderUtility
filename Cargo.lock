@@ -104,12 +104,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.91"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c042108f3ed77fd83760a5fd79b53be043192bb3b9dba91d8c574c0ada7850c8"
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -929,6 +923,7 @@ dependencies = [
 [[package]]
 name = "ilias"
 version = "0.1.0"
+source = "git+https://github.com/Mr-Pine/ilias-rs.git#24e0174ece05767a275951b2197d2bc583899267"
 dependencies = [
  "base64",
  "chrono",
@@ -951,7 +946,6 @@ dependencies = [
 name = "ilias_uploader_utility"
 version = "2.0.0"
 dependencies = [
- "anyhow",
  "clap",
  "dialoguer",
  "env_logger",
@@ -961,6 +955,7 @@ dependencies = [
  "regex",
  "reqwest",
  "serde",
+ "snafu",
  "toml",
 ]
 
@@ -2060,6 +2055,7 @@ version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "223891c85e2a29c3fe8fb900c1fae5e69c2e42415e3177752e8718475efa5019"
 dependencies = [
+ "backtrace",
  "snafu-derive",
 ]
 

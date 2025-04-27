@@ -1,15 +1,14 @@
-use anyhow::Result;
-
 use ilias::{client::IliasClient, local_file::NamedLocalFile};
+use snafu::Whatever;
 
 use crate::preselect_delete_setting::PreselectDeleteSetting;
 
 pub trait UploadProvider {
     type UploadedFile: ToString;
-    fn upload_files(&self, ilias_client: &IliasClient, file_data: &[NamedLocalFile]) -> Result<()>;
+    fn upload_files(&self, ilias_client: &IliasClient, file_data: &[NamedLocalFile]) -> Result<(), Whatever>;
     fn get_existing_files(&self) -> Vec<&Self::UploadedFile>;
     fn delete_files(&self, ilias_client: &IliasClient, files: &[&Self::UploadedFile])
-        -> Result<()>;
+        -> Result<(), Whatever>;
     fn preselect_files<'a>(
         &self,
         preselect_setting: PreselectDeleteSetting,

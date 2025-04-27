@@ -1,17 +1,16 @@
-use anyhow::{Ok, Result};
-
 use crate::preselect_delete_setting::PreselectDeleteSetting;
 use ilias::{
     client::IliasClient,
     folder::{Folder, FolderElement},
     local_file::NamedLocalFile,
 };
+use snafu::{ResultExt, Whatever};
 
 use super::upload_provider::UploadProvider;
 impl UploadProvider for Folder {
     type UploadedFile = FolderElement;
 
-    fn upload_files(&self, ilias_client: &IliasClient, file_data: &[NamedLocalFile]) -> Result<()> {
+    fn upload_files(&self, ilias_client: &IliasClient, file_data: &[NamedLocalFile]) -> Result<(), Whatever> {
         self.upload_files(ilias_client, file_data)
     }
 
@@ -19,9 +18,9 @@ impl UploadProvider for Folder {
         &self,
         ilias_client: &IliasClient,
         files: &[&Self::UploadedFile],
-    ) -> Result<()> {
+    ) -> Result<(), Whatever> {
         for file in files {
-            file.delete(ilias_client)?;
+            file.delete(ilias_client).whatever_context("Unable to delete file")?;
         }
         Ok(())
     }
